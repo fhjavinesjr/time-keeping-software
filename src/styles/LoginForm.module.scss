@@ -1,0 +1,120 @@
+
+.Login {
+  border-radius: 8px;
+  background-color: #fff;
+  width: 1250px;
+  padding: 24px;
+  font: var(--sds-typography-body-font-weight-regular) var(--sds-typography-body-size-medium) var(--sds-typography-body-font-family);
+  border: 1px solid #d9d9d9;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+
+  .loginImageInput {
+    margin: 18px 0 0 50px;
+    display: flex;
+
+    .loginImage {
+      display: block;
+    }
+  }
+
+  .borderLeft {
+    margin-left:100px;
+    border-left: 1px solid #d9d9d9;
+  }
+
+  .inputs {
+    margin: auto;
+    width: 350px;
+
+    .horizontalLine {
+      border-bottom: 1px solid #d9d9d9;
+      margin-top: 32px;
+      margin-bottom: 32px;
+    }
+  }
+
+  .inputField {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 24px;
+  }
+  
+  .label {
+    color: var(--sds-color-text-default-default);
+    line-height: 1.4;
+    margin-bottom: 8px;
+  }
+  
+  .input {
+    border-radius: 8px;
+    background-color: #fff;
+    color: var(--sds-color-text-default-tertiary);
+    line-height: 1;
+    padding: 12px 16px;
+    border: 1px solid #d9d9d9;
+  }
+  
+  .buttonGroup {
+    width: 100%;
+    color: var(--sds-color-text-brand-on-brand);
+    line-height: 1;
+    margin-bottom: 12px;
+  }
+  
+  .signInButton {
+    border-radius: 8px;
+    background-color: #318CE7;
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #318CE7;
+    color: #fff;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .signUpButton {
+    border-radius: 8px;
+    background-color: #03C03C;
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #03C03C;
+    color: #fff;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .signIn-button:hover {
+    opacity: 0.9;
+  }
+
+  .signIn-button:focus {
+    outline: 2px solid #000;
+    outline-offset: 2px;
+  }
+
+  .signUp-button:hover {
+    opacity: 0.9;
+  }
+
+  .signUp-button:focus {
+    outline: 2px solid #000;
+    outline-offset: 2px;
+  }
+  
+  .forgotPassword {
+    color: var(--sds-color-text-default-default);
+    line-height: 1.4;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 14px;
+  }
+  
+  @media (max-width: 640px) {
+    .button {
+      font-family: __Inter_d65c78, sans-serif;
+    }
+  }
+}

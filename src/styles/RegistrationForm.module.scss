@@ -1,0 +1,106 @@
+
+.Registration {
+    border-radius: 8px;
+    background: #fff;
+    display: flex;
+    width: 350px;
+    flex-direction: column;
+    padding: 24px;
+    border: 1px solid #d9d9d9;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin-top: 150px;
+
+    .confirmPasswordMatchMessage {
+        color: #03C03C;
+        font-size: 15px;
+        margin-bottom: 30px;
+    }
+
+    .confirmPasswordNotMatchMessage {
+        color: #D2122E;
+        font-size: 15px;
+        margin-bottom: 30px;
+    }
+
+    .inputField {
+        display: flex;
+        width: 100%;
+        flex-direction: column;
+        margin-bottom: 24px;
+    }
+        
+    .inputField:first-child {
+        margin-top: 0;
+    }
+        
+    .label {
+        color: var(--sds-color-text-default-default);
+        line-height: 1.4;
+        margin-bottom: 8px;
+    }
+    
+    .input, .textarea {
+        border-radius: 8px;
+        background: #fff;
+        padding: 12px 16px;
+        color: var(--sds-color-text-default-tertiary);
+        line-height: 1;
+        border: 1px solid #d9d9d9;
+        margin-bottom: 20px;
+    }
+    
+    .textareaField {
+        display: flex;
+        width: 100%;
+        flex-direction: column;
+        margin-bottom: 24px;
+    }
+    
+    .textareaWrapper {
+        position: relative;
+    }
+    
+    .textarea {
+        min-height: 80px;
+        resize: both;
+        min-width: 90%;
+    }
+    
+    .resizeHandle {
+        position: absolute;
+        right: 5px;
+        bottom: 6px;
+        width: 7px;
+        height: 7px;
+        pointer-events: none;
+    }
+    
+    .buttonGroup {
+        display: flex;
+        width: 100%;
+    }
+    
+    .button {
+        width: 100%;
+        border-radius: 8px;
+        background: #03c03c;
+        color: #fff;
+        padding: 12px;
+        border: 1px solid #03c03c;
+        cursor: pointer;
+        line-height: 1;
+        font-size: 20px;
+    }
+    
+    .button:hover {
+        opacity: 0.9;
+    }
+    
+    .button:focus {
+        outline: 2px solid #000;
+        outline-offset: 2px;
+    }
+}
