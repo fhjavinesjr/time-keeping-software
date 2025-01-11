@@ -1,12 +1,11 @@
 import React from 'react'
-import Main from '@/app/main/Main';
+import Main from '@/app/time-keeping/main/Main';
+import Dashboard from './Dashboard';
 
 export default function DashboardPage() {
     return (
         <Main>
-            <div>
-                Dashboard
-            </div>
+            <Dashboard />
         </Main>
     );
 }

@@ -2,8 +2,8 @@
 
 import React from "react";
 import styles from "@/styles/LoginForm.module.scss";
-import InputFieldSetup from "../../components/login/InputFieldSetup";
-import ButtonSetup from "../../components/login/SetupButton";
+import InputFieldSetup from "../../../components/login/InputFieldSetup";
+import ButtonSetup from "../../../components/login/SetupButton";
 import Image from "next/image";
 import Link from "next/link";
 import Swal from "sweetalert2";
@@ -36,7 +36,7 @@ export default function LoginPage() {
           backdrop: true,
         }).then((result) => {
           if(result.isConfirmed) {
-            router.push("/main");
+            router.push("/time-keeping/dashboard");
           }
         });
 
@@ -88,7 +88,7 @@ export default function LoginPage() {
           <ButtonSetup buttonType="submit" label="Sign In" />
           <ButtonSetup buttonType={undefined} label="Forgot Password?" />
           <div className={styles.horizontalLine}></div>
-          <Link href={"/registration"}>
+          <Link href={"/time-keeping/registration"}>
             <ButtonSetup buttonType="button" label="Sign Up" />
           </Link>
         </div>

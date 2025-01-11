@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic"; //It ensures the page is always rendered
 
 import React from "react";
 import styles from "@/styles/RegistrationForm.module.scss";
-import InputFieldForm from "../../components/registration/InputFieldForm";
+import InputFieldForm from "../../../components/registration/InputFieldForm";
 import { useRouter } from "next/navigation"; //use next/navigation if the page is dynamic (server-rendered or client-rendered)
 import Swal from "sweetalert2";
 
@@ -43,7 +43,7 @@ export default function Registration() {
           backdrop: true,
         }).then((result) => {
           if(result.isConfirmed) {
-            router.push("/");
+            router.push("/time-keeping");
           }
         });
 
