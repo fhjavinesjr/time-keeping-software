@@ -1,0 +1,108 @@
+
+.TimeShift {
+
+    display: block;
+    font-weight: 400;
+    margin-bottom: 10px;
+    font-size: 24px;
+
+    .effectivityDateHeader {
+        margin-bottom: 24px;
+    }
+
+    .dateFromTo {
+        display: flex;
+        gap: 50px;
+        font-size: 14px;
+    }
+
+    .datePickerWrapper {
+        display: flex;
+        align-items: center;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        background-color: #fff;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        width: 100%;
+        max-width: 260px;
+        margin: 0.5rem 0;
+        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+      
+        &:hover {
+          border-color: #007bff; /* Light blue hover */
+        }
+      
+        .input {
+          flex: 1; /* Fills remaining space */
+          border: none;
+          outline: none;
+          font-size: 0.8rem;
+          color: #333;
+          background: transparent;
+          padding: 0.5rem;
+          cursor: pointer;
+          width: 240px;
+      
+          &::placeholder {
+            color: #999;
+          }
+      
+          &:focus {
+            outline: none;
+            box-shadow: none;
+          }
+        }
+      
+        .iconButton {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background-color: #007bff; /* Blue button background */
+          border: none;
+          border-radius: 5px;
+          padding: 0.3rem;
+          margin-left: 0.5rem; /* Add spacing between input and icon */
+          color: white;
+          cursor: pointer;
+          transition: background-color 0.3s ease, box-shadow 0.3s ease;
+      
+          &:hover {
+            background-color: #0056b3; /* Darker blue on hover */
+            box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.2);
+          }
+      
+          &:focus {
+            outline: none;
+            box-shadow: 0px 4px 8px rgba(0, 123, 255, 0.4);
+          }
+      
+          .icon {
+            font-size: 1rem;
+          }
+        }
+      
+        &:focus-within {
+          border-color: #007bff;
+          box-shadow: 0px 4px 8px rgba(0, 123, 255, 0.2);
+        }
+      
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+          padding: 0.3rem;
+          border-radius: 4px;
+      
+          .input {
+            font-size: 0.9rem;
+          }
+      
+          .iconButton {
+            padding: 0.4rem;
+          }
+      
+          .icon {
+            font-size: 1rem;
+          }
+        }
+      }
+
+}
