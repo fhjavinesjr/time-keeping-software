@@ -1,0 +1,188 @@
+/* Form for the EditButton on Address*/
+
+
+.mainTitle {
+  margin-top: 0;
+  line-height: 10px;
+  border-bottom: 1px solid #9c9a9a;
+  width: 100%; 
+  padding: 0;
+  color: #413fb4;
+}
+
+//make the <label> and dropdown into column
+.Labelcolumn{
+    display: flex; 
+    flex-direction: column; /* Arrange elements horizontally */
+    margin-left: 10px; 
+    padding: 10px 25px; 
+    color: #454545;
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+
+}
+.label {
+  display: inline-block; // Keeps text in one line
+  margin-bottom: 5px; // Optional, space between label and input
+  font-size: 14px; // Adjust based on your design
+  font-weight: bold; // Or use another weight as needed
+  color: #454545;
+  font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+}
+
+.dropdown1 {
+    padding-top: 20px;
+    width: 50%;
+    padding: 10px 25px;
+    margin-left: 20px;
+    margin-top: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: white;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+
+
+    &:hover {
+      border-color: #007bff; // Change border color on hover
+    }
+  
+    &:focus {
+      outline: none;
+      border-color: #0056b3;
+      box-shadow: 0px 0px 5px rgba(0, 91, 187, 0.5);
+    }
+    
+  }
+  .dropdown2 {
+    padding-top: 20px;
+    width: 50%;
+    padding: 10px 25px;
+    margin-top: 20px;
+    margin-left: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: white;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+
+
+    &:hover {
+      border-color: #007bff; // Change border color on hover
+    }
+  
+    &:focus {
+      outline: none;
+      border-color: #0056b3;
+      box-shadow: 0px 0px 5px rgba(0, 91, 187, 0.5);
+    }
+    
+  }
+  
+  .modalOverlay {
+    position: fixed; /* Ensures it covers the entire viewport */
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5); /* Darken background */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000; /* Ensure it's above all other elements */
+  }
+  
+  .modalContent {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    width: 40%;
+    max-width: 500px;
+    z-index: 1001; /* Above the overlay */
+    pointer-events: auto;
+  }
+  
+  /* When modal is open, disable pointer events on everything else */
+  .body-disable {
+    pointer-events: none;
+  }
+  
+  
+  .closeButton {
+    background: #d60217;
+    color: #fff;
+    border: none;
+    padding: 10px 10px;
+    cursor: pointer;
+    border-radius: 5px;
+    margin-top: 10px;
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+
+    &:hover{
+      opacity: 0.9;
+      cursor: pointer;
+      transform: scale(1.05);
+      
+    }
+  }
+  
+
+  .submitButton {
+    background: #03c03c;
+    color: #fff;
+    border: none;
+    padding: 10px 10px;
+    cursor: pointer;
+    border-radius: 5px;
+    margin-top: 10px;
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    font: 20px;
+    
+      
+      &:hover{
+        opacity: 0.9;
+        cursor: pointer;
+        transform: scale(1.05);
+       
+      }
+  }
+  .buttonSpacing {
+    width: 20%;
+    padding: 10px 25px;
+    margin-left: 50px;
+    gap: 100px;
+    display: flex; 
+    flex-direction: row; /* Arrange elements horizontally */
+
+
+  }
+  .inputField {
+    padding: 10px 15px;  // Adds padding inside the input box
+    font-size: 16px;  // Text size inside the input
+    border: 1px solid #ccc;  // Light grey border
+    border-radius: 8px;  // Rounded corners for the input box
+    outline: none;  // Removes the default outline when focused
+    transition: border-color 0.3s ease;  // Smooth border color transition on focus
+    width: 50%;  // Makes the input take the full width of its container
+    box-sizing: border-box;  // Ensures padding and border are included in width
+    margin-left: 20px;
+    margin-top: 20px;
+    // Focus state for the input
+    &:focus {
+      border-color: #007bff;  // Blue border when the input is focused
+      box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);  // Subtle glow effect on focus
+    }
+    
+    // Optional: When the user starts typing, add a slight inner shadow for better visibility
+    &::placeholder {
+      color: #888;  // Lighter color for placeholder text
+    }
+  }
+  /* AddressForm.module.scss */
+
+
+
+
+

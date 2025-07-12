@@ -1,11 +1,12 @@
 import React from 'react'
-import Accounts from "./Accounts"
 import Main from "../main/Main"
+import Profile from './Profile';
 
 export default function AccountsPage() {
     return(
         <Main>
-            <Accounts />
+            <Profile/>
+            
         </Main>
     );
 }

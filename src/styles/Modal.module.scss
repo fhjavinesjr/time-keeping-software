@@ -1,7 +1,7 @@
 
 /* The Modal (background) */
 .Modal {
-    display: block; /* Hidden by default */
+    display:block; /* Hidden by default */
     z-index: 1; /* Sit on top */
     padding-top: 30px; /* Location of the box */
     left: 0;
@@ -13,25 +13,35 @@
   /* Modal Content */
   .modalContent {
     position: relative;
-    background-color: #fefefe;
+    background-color: #ffffff;
     margin: auto;
     padding: 0;
     width: 95%;
     box-shadow: 1px 1px 10px 1px rgba(0, 0, 0, 0.1);
-    height: 100vh; /* Ensures the modal takes up the full height of the viewport */
-    max-height: 90vh; /* Optional: set a max height so it doesn't cover too much of the screen */
-    overflow-y: auto; /* Adds scrolling if content exceeds the available space */
+    height: 100vh;
+    max-height: 90vh;
+    overflow-y: auto;
+    
   }
   
   .modalHeader {
+      display: flex;
       padding: 1% 2%;
+      flex-direction: row;
+      align-items: flex-start;
+      
+      
   }
   
   .mainTitle {
-      margin-top: 0;
-      line-height: 40px;
-      border-bottom: 1px solid #eeeeee;
-      color: #5a67ba;
+    margin-top: auto;
+    line-height: 60px;
+    border-bottom: 1px solid #9c9a9a;
+    width: 100%; 
+    padding: 0;
+    color: #5a67ba;
+    display: flex; /* Make mainTitle a flex container */
+    justify-content: space-between; /* Push button to the right */
   }
   
   .modalBody {
