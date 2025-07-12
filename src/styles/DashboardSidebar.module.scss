@@ -2,12 +2,12 @@
 
 .Sidebar {
   background-color: rgb(241, 242, 247);
-  align-self: start;
+  align-self: flex-start;
   z-index: 10;
   display: flex;
   width: 400px;
   flex-direction: column;
-  align-items: start;
+  align-items: flex-start;
   padding-left: 20px;
   font: 400 12px/1 Poppins, sans-serif;
   height: 100dvh;

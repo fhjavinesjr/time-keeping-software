@@ -1,0 +1,50 @@
+$input-border-color: #ccc;
+$input-focus-border-color: #4caf50;
+$hover-background-color: #f0f0f0;
+$bg-white: #fff;
+$border-color: #ddd;
+$hover-border-color: #bbb;
+
+.EmployeeAutosuggestion {
+
+  margin-bottom: 8px;
+  
+  .input {
+    border: 1px solid $input-border-color;
+    padding: 0.5rem;
+    width: 300px;
+    font-size: 1rem;
+    border-radius: 4px;
+    outline: none;
+    transition: border-color 0.3s;
+
+    &:focus {
+      border-color: $input-focus-border-color;
+    }
+
+    &::placeholder {
+      color: #999;
+    }
+  }
+
+  .suggestionsList {
+    border: 1px solid $border-color;
+    margin-top: 0.5rem;
+    background-color: $bg-white;
+    border-radius: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+
+    &_item {
+      padding: 0.75rem;
+      cursor: pointer;
+      transition: background-color 0.3s, border-color 0.3s;
+      list-style-type: none;
+
+      &:hover {
+        background-color: $hover-background-color;
+        border-left: 4px solid $input-focus-border-color;
+      }
+    }
+  }
+}

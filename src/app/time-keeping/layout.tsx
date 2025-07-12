@@ -1,5 +1,6 @@
 //Layout.tsx is the main parent file
 
+import React from "react";
 import type { Metadata } from "next";
 import './globals.css';
 
