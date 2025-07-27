@@ -8,6 +8,7 @@ import Image from "next/image";
 import Link from "next/link";
 import Swal from "sweetalert2";
 import { useRouter } from "next/navigation"; //use next/navigation if the page is dynamic (server-rendered or client-rendered)
+import { authToken } from "@/pages/api/authToken";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,12 +21,26 @@ export default function LoginPage() {
 
     try {
 
-      const response = await fetch('/api/login', {
+      const employeeNo = formData.get("employeeNo") as string;
+      const employeePassword = formData.get("employeePassword") as string;
+
+      //Invoke Login API endpoint for Login
+      const response = await fetch('http://localhost:8084/api/employee/login', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          employeeNo: employeeNo,
+          employeePassword: employeePassword,
+        }),
       });
       
       if (response.ok) {
+
+        //save/store the token from SB
+        const token = await response.text(); //token as plain string
+        authToken.set(token); //save to the utilities
 
         Swal.fire({
           title: "Login Successfully!",
@@ -51,6 +66,12 @@ export default function LoginPage() {
 
     } catch(error) {
       console.error("Error submitting form:", error);
+      Swal.fire({
+          title: "Login failed!",
+          text: "Unreachable backend service",
+          icon: "error",
+          confirmButtonText: "OK"
+        });
     }
   }
   
@@ -78,7 +99,7 @@ export default function LoginPage() {
             required="true"
           />
           <InputFieldSetup
-            name="password"
+            name="employeePassword"
             label="Password"
             inputType="password"
             id="passwordId"

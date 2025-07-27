@@ -1,0 +1,44 @@
+
+.DTRPage {
+  display: block;
+  align-items: flex-end;
+  margin-bottom: 2rem;
+  width: 25px;
+
+  .formGroup {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 300px;
+    margin-bottom: 10px;
+
+    label {
+      font-size: 0.85rem;
+      margin-bottom: 0.3rem;
+      font-weight: 600;
+    }
+
+    input,
+    select {
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 0.95rem;
+    }
+  }
+
+  .searchButton {
+    padding: 0.65rem 1.2rem;
+    background-color: #0070f3;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: #0051aa;
+    }
+  }
+}
