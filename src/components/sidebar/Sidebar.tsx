@@ -17,8 +17,8 @@ const menuItems = [
   {
     id: 2,
     icon: "/time_keeping.png",
-    label: "Time Keeping",
-    goto: "/time-keeping",
+    label: "Daily Time Record",
+    goto: "/time-keeping/dtr",
     isActive: false,
   },
 ];

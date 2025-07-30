@@ -38,9 +38,9 @@ export default function InputFieldForm() {
 
   return (
     <div className={styles.inputField}>
-      <label htmlFor="employeeId" className={styles.label}>Employee No</label>
+      <label htmlFor="employeeNo" className={styles.label}>Employee No</label>
       <input
-        id="employeeId"
+        id="employeeNo"
         type="text"
         name="employeeNo"
         className={styles.input}
@@ -84,7 +84,7 @@ export default function InputFieldForm() {
       <input
         id="firstname"
         type="text"
-        name="Firstname"
+        name="firstname"
         className={styles.input}
         aria-label="Firstname"
         required
