@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 export const dynamic = "force-dynamic"; //It ensures the page is always rendered dynamically (server-rendered or client-rendered) and skips static generation during build time.
 
@@ -13,57 +13,78 @@ export default function Registration() {
 
   // Handle form submission
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); // Prevent the default form submission
+    event.preventDefault();
 
-    // Create a new FormData object from the form
     const form = event.target as HTMLFormElement;
     const formData = new FormData(form);
-    
+
+    const password = formData.get("password");
+    const confirmPassword = formData.get("confirmPassword");
+
+    if (password !== confirmPassword) {
+      Swal.fire({
+        title: "Failed",
+        text: "Password does not match!",
+        icon: "error",
+        confirmButtonText: "OK",
+      });
+      return;
+    }
+
+    const payload = {
+      employeeNo: formData.get("employeeNo") as string,
+      employeePassword: password as string,
+      firstname: formData.get("firstname") as string,
+      lastname: formData.get("lastname") as string,
+      suffix: formData.get("extensionName") as string,
+      email: formData.get("email") as string,
+      position: formData.get("positionTitle") as string,
+      shortJobDesc: formData.get("shortJobDescription") as string,
+    };
+
     try {
-
-      const password = formData.get("password");
-      const confirmPassword = formData.get("confirmPassword");
-
-      if(password === confirmPassword) {
-        const response = await fetch("/api/register", {
+      const response = await fetch(
+        "http://localhost:8084/api/employee/register",
+        {
           method: "POST",
-          body: formData, // Send FormData directly
-        });
-    
-        if (!response.ok) {
-          throw new Error("Failed to submit form");
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
         }
+      );
 
-        Swal.fire({
-          title: "Successful",
-          text: "Information was saved",
-          icon: "success",
-          confirmButtonText: "OK",
-          allowOutsideClick: false,
-          backdrop: true,
-        }).then((result) => {
-          if(result.isConfirmed) {
-            router.push("/time-keeping");
-          }
-        });
-
-      } else {
-        Swal.fire({
-          title: "Failed",
-          text: "Password does not match!",
-          icon: "error",
-          confirmButtonText: "OK"
-        });
+      if (!response.ok) {
+        const errorBody = await response.json();
+        console.error("Backend errors:", errorBody);
+        throw new Error("Failed to submit form");
       }
 
+      Swal.fire({
+        title: "Successful",
+        text: "Information was saved",
+        icon: "success",
+        confirmButtonText: "OK",
+        allowOutsideClick: false,
+        backdrop: true,
+      }).then((result) => {
+        if (result.isConfirmed) {
+          router.push("/time-keeping");
+        }
+      });
     } catch (error) {
       console.error("Error submitting form:", error);
+      Swal.fire({
+        title: "Failed Registration",
+        text: "Please check fields",
+        icon: "error",
+        confirmButtonText: "OK",
+      });
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className={styles.Registration} >
-
+    <form onSubmit={handleSubmit} className={styles.Registration}>
       <InputFieldForm />
 
       <div className={styles.buttonGroup}>
