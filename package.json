@@ -10,8 +10,12 @@
     "clean": "rimraf .next"
   },
   "dependencies": {
+    "@fullcalendar/daygrid": "^6.1.18",
+    "@fullcalendar/interaction": "^6.1.18",
+    "@fullcalendar/react": "^6.1.18",
     "@prisma/client": "^5.22.0",
     "@svgr/webpack": "^8.1.0",
+    "@types/fullcalendar": "^3.8.0",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
     "bootstrap": "^5.3.3",

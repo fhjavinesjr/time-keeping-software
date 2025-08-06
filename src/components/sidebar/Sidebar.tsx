@@ -27,8 +27,8 @@ const otherItems = [
   {
     id: 3,
     icon: "/time_shift.png",
-    label: "Time Shift",
-    goto: "/time-keeping/time-shift",
+    label: "Work Schedule",
+    goto: "/time-keeping/workschedule",
     isActive: false,
   },
   {

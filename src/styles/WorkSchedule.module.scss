@@ -1,0 +1,64 @@
+
+.legend {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+
+  h3 {
+    margin: auto;
+    font-size: 1.1rem;
+    color: #333;
+  }
+
+  .legendGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); // 🔥 3 columns
+    gap: 0.75rem;
+  }
+
+  .legendItem {
+    display: flex;
+    justify-content: center; /* horizontal center */
+    align-items: center;     /* vertical center */
+    text-align: center;      /* center text inside */
+    padding: 0.25rem 0;
+    font-size: 0.95rem;
+    color: #444;
+
+    strong {
+      color: #0056b3;
+      margin-right: 0.25rem;
+    }
+  }
+
+}
+
+.WorkSchedule {
+  padding: 1rem;
+
+  /* You can target FullCalendar classes directly */
+  .fc {
+    font-family: 'Segoe UI', sans-serif;
+    background-color: #fff;
+  }
+
+  .fc-daygrid-day-number {
+    font-weight: bold;
+    font-size: 0.9rem;
+  }
+
+  .fc-event {
+    background-color: #0088cc;
+    border: none;
+    font-size: 0.75rem;
+    padding: 2px 4px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .fc-toolbar-title {
+    font-size: 1.2rem;
+  }
+}

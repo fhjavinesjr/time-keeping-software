@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 import React from "react";
 import styles from "@/styles/LoginForm.module.scss";
@@ -8,7 +8,9 @@ import Image from "next/image";
 import Link from "next/link";
 import Swal from "sweetalert2";
 import { useRouter } from "next/navigation"; //use next/navigation if the page is dynamic (server-rendered or client-rendered)
-import { authToken } from "@/pages/api/authToken";
+import { localStorageUtil } from "@/lib/utils/localStorageUtil";
+import { fetchWithAuth } from "@/pages/api/fetchWithAuth";
+import { Employee } from '@/lib/types/Employee';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,61 +22,74 @@ export default function LoginPage() {
     const formData = new FormData(form);
 
     try {
-
       const employeeNo = formData.get("employeeNo") as string;
       const employeePassword = formData.get("employeePassword") as string;
 
-      //Invoke Login API endpoint for Login
-      const response = await fetch('http://localhost:8084/api/employee/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          employeeNo: employeeNo,
-          employeePassword: employeePassword,
-        }),
+      // Login
+      const response = await fetch("http://localhost:8084/api/employee/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeNo, employeePassword }),
       });
-      
-      if (response.ok) {
 
-        //save/store the token from SB
-        const token = await response.text(); //token as plain string
-        authToken.set(token); //save to the utilities
-
-        Swal.fire({
-          title: "Login Successfully!",
-          text: "Press OK to proceeed",
-          icon: "success",
-          confirmButtonText: "OK",
-          allowOutsideClick: false,
-          backdrop: true,
-        }).then((result) => {
-          if(result.isConfirmed) {
-            router.push("/time-keeping/dashboard");
-          }
-        });
-
-      } else {
+      if (!response.ok) {
         Swal.fire({
           title: "Login failed!",
           text: "Incorrect username or password",
           icon: "error",
-          confirmButtonText: "OK"
+          confirmButtonText: "OK",
         });
+        return;
       }
 
-    } catch(error) {
-      console.error("Error submitting form:", error);
+      const token = await response.text();
+      localStorageUtil.set(token); // Store authToken
+
+      // Fetch employees
+      const empRes = await fetchWithAuth(
+        "http://localhost:8084/api/employees/basicInfo"
+      );
+
+      if (!empRes.ok) {
+        throw new Error("Failed to fetch employee list");
+      }
+
+      const employees: Employee[] = await empRes.json();
+      localStorageUtil.setEmployees(employees); //Store employees list to be used later in other module
+
+      // Identify current employee
+      const currentEmp = employees.find(emp => emp.employeeNo === employeeNo);
+
+      if (currentEmp) {
+        localStorageUtil.setEmployeeNo(currentEmp.employeeNo); // Store employeeNo
+        localStorageUtil.setEmployeeFullname(currentEmp.fullName); // Store fullname
+        localStorageUtil.setEmployeeRole(currentEmp.role);
+      }
+
+      // Success
       Swal.fire({
-          title: "Login failed!",
-          text: "Unreachable backend service",
-          icon: "error",
-          confirmButtonText: "OK"
-        });
+        title: "Login Successfully!",
+        text: "Press OK to proceed",
+        icon: "success",
+        confirmButtonText: "OK",
+        allowOutsideClick: false,
+        backdrop: true,
+      }).then((result) => {
+        if (result.isConfirmed) {
+          router.push("/time-keeping/dashboard");
+        }
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      Swal.fire({
+        title: "Login failed!",
+        text: "Unreachable backend service",
+        icon: "error",
+        confirmButtonText: "OK",
+      });
     }
-  }
-  
+  };
+
   return (
     <form onSubmit={handleSubmit} className={styles.Login} action="">
       <div className={styles.loginImageInput}>

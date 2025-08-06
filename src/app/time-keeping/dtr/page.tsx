@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import DTRTable from "./DTRTable";
 import styles from "@/styles/DTRPage.module.scss";
 import Main from "../main/Main";
 import modalStyles from "@/styles/Modal.module.scss";
 import { fetchWithAuth } from "@/pages/api/fetchWithAuth";
 import useCurrentMonthRange from "@/lib/utils/useCurrentMonthRange";
-import { toDateInputValue, toCustomFormat } from '@/lib/utils/dateFormatUtils';
+import { toDateInputValue, toCustomFormat } from "@/lib/utils/dateFormatUtils";
+import { localStorageUtil } from "@/lib/utils/localStorageUtil";
+import { Employee } from "@/lib/types/Employee";
 
 type DTRRecord = {
   workDate: string;
@@ -20,12 +22,6 @@ type DTRRecord = {
   notes?: string;
 };
 
-type Employee = {
-  id: number;
-  employeeNo: string;
-  fullName: string;
-};
-
 export default function DTRPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
@@ -35,10 +31,22 @@ export default function DTRPage() {
 
   const { fromDate, setFromDate, toDate, setToDate } = useCurrentMonthRange();
 
+  useEffect(() => {
+    const storedEmployees = localStorageUtil.getEmployees();
+    if (storedEmployees != null && storedEmployees.length > 0) {
+      setEmployees(storedEmployees);
+    } else {
+      // fallback fetch if not in localStorage
+      fetchEmployees();
+    }
+  }, []);
+
   // Fetch employees (on focus or page load)
   const fetchEmployees = async () => {
     try {
-      const res = await fetchWithAuth("http://localhost:8084/api/employees/basicInfo");
+      const res = await fetchWithAuth(
+        "http://localhost:8084/api/employees/basicInfo"
+      );
 
       if (!res.ok) {
         console.error("Failed to fetch employees:", res.status);
@@ -57,7 +65,13 @@ export default function DTRPage() {
   const fetchDTR = async () => {
     try {
       if (selectedEmployee && fromDate && toDate) {
-        const res = await fetchWithAuth(`http://localhost:8084/api/employee/dtr?employeeNo=${selectedEmployee.employeeNo}&fromDate=${encodeURIComponent(fromDate)}&toDate=${encodeURIComponent(toDate)}`);
+        const res = await fetchWithAuth(
+          `http://localhost:8084/api/employee/dtr?employeeNo=${
+            selectedEmployee.employeeNo
+          }&fromDate=${encodeURIComponent(
+            fromDate
+          )}&toDate=${encodeURIComponent(toDate)}`
+        );
         const data = await res.json();
         setRecords(data);
         console.log("Successfully fetch DTR employees", res.status);
@@ -86,7 +100,6 @@ export default function DTRPage() {
                   type="text"
                   list="employee-list"
                   placeholder="Employee No / Lastname"
-                  onFocus={fetchEmployees}
                   onChange={(e) => {
                     const selected = employees.find(
                       (emp) =>
