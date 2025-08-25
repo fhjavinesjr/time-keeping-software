@@ -10,6 +10,7 @@ import useCurrentMonthRange from "@/lib/utils/useCurrentMonthRange";
 import { toDateInputValue, toCustomFormat } from "@/lib/utils/dateFormatUtils";
 import { localStorageUtil } from "@/lib/utils/localStorageUtil";
 import { Employee } from "@/lib/types/Employee";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
 
 type DTRRecord = {
   workDate: string;
@@ -44,9 +45,7 @@ export default function DTRPage() {
   // Fetch employees (on focus or page load)
   const fetchEmployees = async () => {
     try {
-      const res = await fetchWithAuth(
-        "http://localhost:8084/api/employees/basicInfo"
-      );
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/employees/basicInfo`);
 
       if (!res.ok) {
         console.error("Failed to fetch employees:", res.status);
@@ -66,7 +65,7 @@ export default function DTRPage() {
     try {
       if (selectedEmployee && fromDate && toDate) {
         const res = await fetchWithAuth(
-          `http://localhost:8084/api/employee/dtr?employeeNo=${
+          `${API_BASE_URL}/api/employee/dtr?employeeNo=${
             selectedEmployee.employeeNo
           }&fromDate=${encodeURIComponent(
             fromDate

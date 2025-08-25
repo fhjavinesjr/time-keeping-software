@@ -7,6 +7,7 @@ import styles from "@/styles/RegistrationForm.module.scss";
 import InputFieldForm from "../../../components/registration/InputFieldForm";
 import { useRouter } from "next/navigation"; //use next/navigation if the page is dynamic (server-rendered or client-rendered)
 import Swal from "sweetalert2";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
 
 export default function Registration() {
   const router = useRouter();
@@ -44,7 +45,7 @@ export default function Registration() {
 
     try {
       const response = await fetch(
-        "http://localhost:8084/api/employee/register",
+        `${API_BASE_URL}/api/employee/register`,
         {
           method: "POST",
           headers: {

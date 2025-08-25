@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation"; //use next/navigation if the page i
 import { localStorageUtil } from "@/lib/utils/localStorageUtil";
 import { fetchWithAuth } from "@/pages/api/fetchWithAuth";
 import { Employee } from '@/lib/types/Employee';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,7 +27,7 @@ export default function LoginPage() {
       const employeePassword = formData.get("employeePassword") as string;
 
       // Login
-      const response = await fetch("http://localhost:8084/api/employee/login", {
+      const response = await fetch(`${API_BASE_URL}/api/employee/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employeeNo, employeePassword }),
@@ -47,7 +48,7 @@ export default function LoginPage() {
 
       // Fetch employees
       const empRes = await fetchWithAuth(
-        "http://localhost:8084/api/employees/basicInfo"
+        `${API_BASE_URL}/api/employees/basicInfo`
       );
 
       if (!empRes.ok) {
