@@ -54,27 +54,54 @@
   }
 
   /* You can target FullCalendar classes directly */
-  .fc {
+  :global(.fc) {
     font-family: 'Segoe UI', sans-serif;
     background-color: #fff;
-  }
+    
+    :global(.fc-daygrid-day-frame) {
+      cursor: pointer;
+    }
 
-  .fc-daygrid-day-number {
-    font-weight: bold;
-    font-size: 0.9rem;
-  }
+    :global(.fc-daygrid-day-number) {
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
 
-  .fc-event {
-    background-color: #0088cc;
-    border: none;
-    font-size: 0.75rem;
-    padding: 2px 4px;
-    border-radius: 4px;
-    cursor: pointer;
-  }
+    :global(.fc-event) {
+      background-color: #0088cc;
+      border: none;
+      font-size: 0.75rem;
+      padding: 2px 4px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
 
-  .fc-toolbar-title {
-    font-size: 1.2rem;
+    :global(.fc-toolbar-title) {
+      font-size: 1.2rem;
+    }
+
+    :global(.fc-daygrid-event) {
+      display: block !important;
+      width: 100% !important;
+      height: 100% !important;  /* fill the cell vertically */
+      margin: 0 !important;
+      padding: 0 !important;
+      border-radius: 0 !important; /* no rounded corners */
+      background-color: #0088cc !important; /* default blue */
+      color: #fff !important;
+      text-align: center;
+      align-content: center; /* vertical centering */
+      font-weight: bold;
+      transition: background-color 0.2s ease, transform 0.1s ease;
+      cursor: pointer; /* show hand cursor */
+    }
+
+    :global(.fc-daygrid-event:hover) {
+      background-color: #006fa3 !important; /* darker blue */
+      transform: scale(1.02); /* subtle zoom */
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); /* small shadow */
+    }
+
   }
 
   .saveContainer {
