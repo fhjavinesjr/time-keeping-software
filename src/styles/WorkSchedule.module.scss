@@ -1,0 +1,128 @@
+
+.WorkSchedule {
+
+  label {
+      font-size: 0.85rem;
+      margin-bottom: 0.3rem;
+      font-weight: 600;
+    }
+
+  input,
+    select {
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      margin-bottom: 15px;;
+      width: 25%;
+    }
+
+  .legend {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+
+    h3 {
+      margin: auto;
+      font-size: 1.1rem;
+      color: #333;
+    }
+
+    .legendGrid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr); // 🔥 3 columns
+      gap: 0.75rem;
+    }
+
+    .legendItem {
+      display: flex;
+      justify-content: center; /* horizontal center */
+      align-items: center;     /* vertical center */
+      text-align: center;      /* center text inside */
+      padding: 0.25rem 0;
+      font-size: 0.95rem;
+      color: #444;
+
+      strong {
+        color: #0056b3;
+        margin-right: 0.25rem;
+      }
+    }
+
+  }
+
+  /* You can target FullCalendar classes directly */
+  :global(.fc) {
+    font-family: 'Segoe UI', sans-serif;
+    background-color: #fff;
+    
+    :global(.fc-daygrid-day-frame) {
+      cursor: pointer;
+    }
+
+    :global(.fc-daygrid-day-number) {
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+
+    :global(.fc-event) {
+      background-color: #0088cc;
+      border: none;
+      font-size: 0.75rem;
+      padding: 2px 4px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    :global(.fc-toolbar-title) {
+      font-size: 1.2rem;
+    }
+
+    :global(.fc-daygrid-event) {
+      display: block !important;
+      width: 100% !important;
+      height: 100% !important;  /* fill the cell vertically */
+      margin: 0 !important;
+      padding: 0 !important;
+      border-radius: 0 !important; /* no rounded corners */
+      background-color: #0088cc !important; /* default blue */
+      color: #fff !important;
+      text-align: center;
+      align-content: center; /* vertical centering */
+      font-weight: bold;
+      transition: background-color 0.2s ease, transform 0.1s ease;
+      cursor: pointer; /* show hand cursor */
+    }
+
+    :global(.fc-daygrid-event:hover) {
+      background-color: #006fa3 !important; /* darker blue */
+      transform: scale(1.02); /* subtle zoom */
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); /* small shadow */
+    }
+
+  }
+
+  .saveContainer {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .saveButton {
+    padding: 10px 20px;
+    background-color: #0070f3;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+
+    &:hover {
+      background-color: #005bb5;
+    }
+  }
+
+}
