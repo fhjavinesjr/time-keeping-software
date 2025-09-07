@@ -9,7 +9,7 @@ import Link from "next/link";
 import Swal from "sweetalert2";
 import { useRouter } from "next/navigation"; //use next/navigation if the page is dynamic (server-rendered or client-rendered)
 import { localStorageUtil } from "@/lib/utils/localStorageUtil";
-import { fetchWithAuth } from "@/pages/api/fetchWithAuth";
+import { fetchWithAuth } from "@/lib/utils/fetchWithAuth";
 import { Employee } from '@/lib/types/Employee';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
 

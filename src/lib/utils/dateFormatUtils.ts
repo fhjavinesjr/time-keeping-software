@@ -8,6 +8,21 @@ export const toDateInputValue = (customFormat: string): string => {
   return `${year}-${month}-${day}`;
 };
 
+export const toDateInputValueExplicit = (customFormat: string): string => {
+  // Handle both MM-DD-YYYY and YYYY-MM-DD
+  const parts = customFormat.split("-");
+  const  month = parseInt(parts[0], 10);
+  const  day = parseInt(parts[1], 10);
+  const  year = parseInt(parts[2], 10);
+
+  // Pad with leading zeros to always match input[type="date"]
+  const mm = String(month).padStart(2, "0");
+  const dd = String(day).padStart(2, "0");
+  
+  console.log(`${year}-${mm}-${dd}`);
+  return `${year}-${mm}-${dd}`;
+};
+
 /**
  * Converts a date string from "yyyy-MM-dd" to "MM-dd-yyyy HH:mm:ss"
  * - isStart: true => time = 00:00:00

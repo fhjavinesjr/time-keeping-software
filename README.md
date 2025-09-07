@@ -2,7 +2,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-After pulling the repository, please create the env file on your time keeping software file.
+After pulling the repository, please create the env file on your time keeping UI file.
 Type in DATABASE_URL="sqlserver://localhost:1433;database=time_keeping;user=admin;password=sa;trustServerCertificate=true;encrypt=true;"
         JWT_SECRET_KEY=time-keeping-software-JWT_SECRET_KEY
 Create your database and login credentials on SQL Server.
