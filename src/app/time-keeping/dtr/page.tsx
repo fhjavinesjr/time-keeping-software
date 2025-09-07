@@ -5,12 +5,13 @@ import DTRTable from "./DTRTable";
 import styles from "@/styles/DTRPage.module.scss";
 import Main from "../main/Main";
 import modalStyles from "@/styles/Modal.module.scss";
-import { fetchWithAuth } from "@/pages/api/fetchWithAuth";
+import { fetchWithAuth } from "@/lib/utils/fetchWithAuth";
 import useCurrentMonthRange from "@/lib/utils/useCurrentMonthRange";
-import { toDateInputValue, toCustomFormat } from "@/lib/utils/dateFormatUtils";
+import { toDateInputValue, toCustomFormat, getFirstDateOfMonth, getLastDateOfMonth, toDateInputValueExplicit } from "@/lib/utils/dateFormatUtils";
 import { localStorageUtil } from "@/lib/utils/localStorageUtil";
 import { Employee } from "@/lib/types/Employee";
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
+const API_BASE_URL_TIMEKEEPING = process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
+import { WorkScheduleDTO } from "@/lib/types/WorkScheduleDTO";
 
 type DTRRecord = {
   workDate: string;
@@ -20,7 +21,13 @@ type DTRRecord = {
   breakIn: string;
   timeOut: string;
   totalHours: string;
-  notes?: string;
+  details?: string;
+  lateMin: string;
+  underMin: string;
+  timeCorrectionFiled?: boolean;
+  overtimeFiled?: boolean;
+  leaveFiled?: boolean;
+  dtrDate: string;
 };
 
 export default function DTRPage() {
@@ -45,7 +52,9 @@ export default function DTRPage() {
   // Fetch employees (on focus or page load)
   const fetchEmployees = async () => {
     try {
-      const res = await fetchWithAuth(`${API_BASE_URL}/api/employees/basicInfo`);
+      const res = await fetchWithAuth(
+        `${API_BASE_URL_TIMEKEEPING}/api/employees/basicInfo`
+      );
 
       if (!res.ok) {
         console.error("Failed to fetch employees:", res.status);
@@ -64,15 +73,49 @@ export default function DTRPage() {
   const fetchDTR = async () => {
     try {
       if (selectedEmployee && fromDate && toDate) {
+        // build start & end dates for the month
+        const monthStart = getFirstDateOfMonth(new Date(fromDate).getMonth() + 1, new Date(fromDate).getFullYear());
+        const monthEnd = getLastDateOfMonth(new Date(toDate).getMonth() + 1, new Date(toDate).getFullYear());
+        
+        const resWs = await fetchWithAuth(`${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule?employeeNo=${
+            selectedEmployee.employeeNo
+          }&monthStart=${monthStart}&monthEnd=${monthEnd}`
+        );
+
+        if (resWs.status === 204) {
+          console.log("No work schedule found for this employee/month");
+          return;
+        }
+
+        if (!resWs.ok) {
+          throw new Error(`Failed to fetch work schedule: ${resWs.status}`);
+        }
+
+        const workScheduleJson = await resWs.json();
+
         const res = await fetchWithAuth(
-          `${API_BASE_URL}/api/employee/dtr?employeeNo=${
+          `${API_BASE_URL_TIMEKEEPING}/api/employee/dtr?employeeNo=${
             selectedEmployee.employeeNo
           }&fromDate=${encodeURIComponent(
             fromDate
           )}&toDate=${encodeURIComponent(toDate)}`
         );
-        const data = await res.json();
-        setRecords(data);
+        const dtrJson  = await res.json();
+
+        // merge WorkSchedule shift code into DTR records
+        const mappedRecords: DTRRecord[] = dtrJson.map((record: DTRRecord) => {
+          const ws = workScheduleJson.find(
+            (schedule: WorkScheduleDTO) =>
+              toDateInputValueExplicit(schedule.wsDateTime) === toDateInputValueExplicit(record.dtrDate)
+          );
+
+          return {
+            ...record,
+            shift: ws ? ws.tsCode : "-", // add shiftCode if found, else fallback
+          };
+        });
+        
+        setRecords(mappedRecords);
         console.log("Successfully fetch DTR employees", res.status);
       } else {
         console.error("Error fetching DTR employees");

@@ -11,7 +11,7 @@ import modalStyles from "@/styles/Modal.module.scss";
 import { localStorageUtil } from "@/lib/utils/localStorageUtil";
 import { Employee } from "@/lib/types/Employee"; // ✅ Shared employee type
 import Swal from "sweetalert2";
-import { fetchWithAuth } from "@/pages/api/fetchWithAuth";
+import { fetchWithAuth } from "@/lib/utils/fetchWithAuth";
 import {
   toDateInputValue,
   toCustomFormat,
@@ -23,6 +23,7 @@ const API_BASE_URL_ADMINISTRATIVE =
 const API_BASE_URL_TIMEKEEPING =
   process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
 import to12HourFormat from '@/lib/utils/convert24To12HrFormat';
+import {WorkScheduleDTO} from '@/lib/types/WorkScheduleDTO';
 
 type ShiftEvent = {
   wsId: number;
@@ -36,13 +37,6 @@ type TimeShift = {
   breakOut: string;
   breakIn: string;
   timeOut: string;
-};
-
-type WorkScheduleDTO = {
-  wsId: number;
-  employeeNo: string;
-  tsCode: string;
-  wsDateTime: string; // backend datetime string
 };
 
 export default function WorkSchedule() {
@@ -121,9 +115,7 @@ export default function WorkSchedule() {
       const monthStart = getFirstDateOfMonth(month, year);
       const monthEnd = getLastDateOfMonth(month, year);
 
-      const res = await fetchWithAuth(
-        `${API_BASE_URL_TIMEKEEPING}/api/getAll/work-schedule?employeeNo=${employeeNo}&monthStart=${monthStart}&monthEnd=${monthEnd}`
-      );
+      const res = await fetchWithAuth(`${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule?employeeNo=${employeeNo}&monthStart=${monthStart}&monthEnd=${monthEnd}`);
 
       if (res.status === 204) {
         console.log("No work schedule found for this employee/month");

@@ -1,4 +1,4 @@
-import { localStorageUtil } from '../../lib/utils/localStorageUtil';
+import { localStorageUtil } from './localStorageUtil';
 
 export const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
   const token = localStorageUtil.get();

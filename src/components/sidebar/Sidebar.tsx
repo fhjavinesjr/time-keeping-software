@@ -21,9 +21,6 @@ const menuItems = [
     goto: "/time-keeping/dtr",
     isActive: false,
   },
-];
-
-const otherItems = [
   {
     id: 3,
     icon: "/time_shift.png",
@@ -31,6 +28,9 @@ const otherItems = [
     goto: "/time-keeping/workschedule",
     isActive: false,
   },
+];
+
+const otherItems = [
   {
     id: 4,
     icon: "/accounts.png",
@@ -54,8 +54,8 @@ export default function Sidebar() {
   return (
     <nav className={styles.Sidebar} role="navigation" aria-label="Main navigation">
       <div className={styles.brand}>
-        <div className={styles.brandIcon}>TKS</div>
-        <div className={styles.brandName}>Time Keeping Software</div>
+        <div className={styles.brandIcon}>TKUI</div>
+        <div className={styles.brandName}>Time Keeping UI</div>
       </div>
 
       <div className={styles.menuSection}>
@@ -68,7 +68,7 @@ export default function Sidebar() {
       </div>
 
       <div className={styles.menuSection}>
-        <h2 className={styles.menuHeader}>OTHERS</h2>
+        <h2 className={styles.menuHeader}>UTILITIES</h2>
         <div role="menu">
           {otherItems.map((item, index) => (
             <MenuItem key={index} icon={item.icon} label={item.label} goto={item.goto} isActive={pathname === item.goto} onClick={() => {}} />
