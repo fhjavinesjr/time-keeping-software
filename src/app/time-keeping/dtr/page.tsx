@@ -11,16 +11,17 @@ import { toDateInputValue, toCustomFormat, getFirstDateOfMonth, getLastDateOfMon
 import { localStorageUtil } from "@/lib/utils/localStorageUtil";
 import { Employee } from "@/lib/types/Employee";
 const API_BASE_URL_TIMEKEEPING = process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
+const API_BASE_URL_ADMINISTRATIVE = process.env.NEXT_PUBLIC_API_BASE_URL_ADMINISTRATIVE;
 import { WorkScheduleDTO } from "@/lib/types/WorkScheduleDTO";
 
 type DTRRecord = {
   workDate: string;
+  shiftCode: string;
   shift: string;
   timeIn: string;
   breakOut: string;
   breakIn: string;
   timeOut: string;
-  totalHours: string;
   details?: string;
   lateMin: string;
   underMin: string;
@@ -30,12 +31,21 @@ type DTRRecord = {
   dtrDate: string;
 };
 
+type TimeShift = {
+  tsCode: string;
+  timeIn: string;
+  breakOut: string;
+  breakIn: string;
+  timeOut: string;
+};
+
 export default function DTRPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
     null
   );
   const [records, setRecords] = useState<DTRRecord[]>([]);
+  const [timeShift, setTimeShift] = useState<TimeShift[]>([]);
 
   const { fromDate, setFromDate, toDate, setToDate } = useCurrentMonthRange();
 
@@ -111,11 +121,13 @@ export default function DTRPage() {
 
           return {
             ...record,
-            shift: ws ? ws.tsCode : "-", // add shiftCode if found, else fallback
+            shiftCode: ws ? ws.tsCode : "-", // add shiftCode if found, else fallback
           };
         });
         
         setRecords(mappedRecords);
+        fetchTimeSfhit();
+
         console.log("Successfully fetch DTR employees", res.status);
       } else {
         console.error("Error fetching DTR employees");
@@ -123,6 +135,22 @@ export default function DTRPage() {
       }
     } catch (error) {
       console.error("Error fetching DTR employees:", error);
+    }
+  };
+
+  //fetch All TimeShift from administrative db table
+  const fetchTimeSfhit = async () => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL_ADMINISTRATIVE}/api/getAll/time-shift`);
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch timeshifts: ${res.status}`);
+      }
+
+      const data = await res.json();
+      setTimeShift(data);
+    } catch (err) {
+      console.error("Failed to fetch timeshifts:", err);
     }
   };
 
@@ -189,7 +217,7 @@ export default function DTRPage() {
                 Search
               </button>
             </div>
-            {records.length > 0 && <DTRTable records={records} />}
+            {records.length > 0 && <DTRTable records={records} timeShifts={timeShift} />}
           </div>
         </div>
       </div>
