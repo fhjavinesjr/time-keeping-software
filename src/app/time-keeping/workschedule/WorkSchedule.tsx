@@ -373,7 +373,7 @@ export default function WorkSchedule() {
                   <datalist id="shift-list">
                     {timeShift.map((shift) => (
                       <option key={shift.tsCode} value={shift.tsCode}>
-                        {`${shift.timeIn} - ${shift.breakOut}/${shift.breakIn} - ${shift.timeOut}`}
+                        {to12HourFormat(shift.timeIn)+"-"}{shift.breakOut != null?to12HourFormat(shift.breakOut)+"/":''}{shift.breakIn != null?to12HourFormat(shift.breakIn)+"-":''}{to12HourFormat(shift.timeOut)}
                       </option>
                     ))}
                   </datalist>
@@ -396,10 +396,7 @@ export default function WorkSchedule() {
               <div className={styles.legendGrid}>
                 {timeShift.map((shift) => (
                   <div key={shift.tsCode} className={styles.legendItem}>
-                    <strong>{shift.tsCode}</strong> – {to12HourFormat(shift.timeIn)}
-                    {` - ${to12HourFormat(shift.breakOut)}`}
-                    {`/${to12HourFormat(shift.breakIn)}`}
-                    {` - ${to12HourFormat(shift.timeOut)}`}
+                    <strong>{shift.tsCode}</strong> – {to12HourFormat(shift.timeIn)+"-"}{shift.breakOut != null?to12HourFormat(shift.breakOut)+"/":''}{shift.breakIn != null?to12HourFormat(shift.breakIn)+"-":''}{to12HourFormat(shift.timeOut)}
                   </div>
                 ))}
               </div>
@@ -428,10 +425,10 @@ export default function WorkSchedule() {
                     {shift && (
                       <div style={{ fontSize: "0.75em", lineHeight: "1.2" }}>
                         <div>
-                          {shift.timeIn} - {shift.breakOut}
+                          {to12HourFormat(shift.timeIn)+'-'}{shift.breakOut != null?to12HourFormat(shift.breakOut):''}
                         </div>
                         <div>
-                          {shift.breakIn} - {shift.timeOut}
+                          {shift.breakIn != null?to12HourFormat(shift.breakIn)+'-':''}{to12HourFormat(shift.timeOut)}
                         </div>
                       </div>
                     )}
