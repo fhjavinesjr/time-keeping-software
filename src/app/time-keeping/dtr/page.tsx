@@ -7,12 +7,21 @@ import Main from "../main/Main";
 import modalStyles from "@/styles/Modal.module.scss";
 import { fetchWithAuth } from "@/lib/utils/fetchWithAuth";
 import useCurrentMonthRange from "@/lib/utils/useCurrentMonthRange";
-import { toDateInputValue, toCustomFormat, getFirstDateOfMonth, getLastDateOfMonth, toDateInputValueExplicit } from "@/lib/utils/dateFormatUtils";
+import {
+  toDateInputValue,
+  toCustomFormat,
+  getFirstDateOfMonth,
+  getLastDateOfMonth,
+  toDateInputValueExplicit,
+} from "@/lib/utils/dateFormatUtils";
 import { localStorageUtil } from "@/lib/utils/localStorageUtil";
 import { Employee } from "@/lib/types/Employee";
-const API_BASE_URL_TIMEKEEPING = process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
-const API_BASE_URL_ADMINISTRATIVE = process.env.NEXT_PUBLIC_API_BASE_URL_ADMINISTRATIVE;
+const API_BASE_URL_TIMEKEEPING =
+  process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
+const API_BASE_URL_ADMINISTRATIVE =
+  process.env.NEXT_PUBLIC_API_BASE_URL_ADMINISTRATIVE;
 import { WorkScheduleDTO } from "@/lib/types/WorkScheduleDTO";
+import Swal from "sweetalert2";
 
 type DTRRecord = {
   workDate: string;
@@ -48,6 +57,8 @@ export default function DTRPage() {
   const [timeShift, setTimeShift] = useState<TimeShift[]>([]);
 
   const { fromDate, setFromDate, toDate, setToDate } = useCurrentMonthRange();
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [inputValue, setInputValue] = useState("");
 
   useEffect(() => {
     const storedEmployees = localStorageUtil.getEmployees();
@@ -56,6 +67,23 @@ export default function DTRPage() {
     } else {
       // fallback fetch if not in localStorage
       fetchEmployees();
+    }
+  }, []);
+
+  useEffect(() => {
+    const role = localStorageUtil.getEmployeeRole();
+    const fullname = localStorageUtil.getEmployeeFullname();
+    const empNo = localStorageUtil.getEmployeeNo();
+
+    setUserRole(role);
+
+    if (fullname && empNo) {
+      const emp = { employeeNo: empNo, fullName: fullname } as Employee;
+      setSelectedEmployee(emp);
+
+      if (role === "ROLE_ADMIN") {
+        setInputValue(`[${emp.employeeNo}] ${emp.fullName}`);
+      }
     }
   }, []);
 
@@ -84,24 +112,14 @@ export default function DTRPage() {
     try {
       if (selectedEmployee && fromDate && toDate) {
         // build start & end dates for the month
-        const monthStart = getFirstDateOfMonth(new Date(fromDate).getMonth() + 1, new Date(fromDate).getFullYear());
-        const monthEnd = getLastDateOfMonth(new Date(toDate).getMonth() + 1, new Date(toDate).getFullYear());
-        
-        const resWs = await fetchWithAuth(`${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule?employeeNo=${
-            selectedEmployee.employeeNo
-          }&monthStart=${monthStart}&monthEnd=${monthEnd}`
+        const monthStart = getFirstDateOfMonth(
+          new Date(fromDate).getMonth() + 1,
+          new Date(fromDate).getFullYear()
         );
-
-        if (resWs.status === 204) {
-          console.log("No work schedule found for this employee/month");
-          return;
-        }
-
-        if (!resWs.ok) {
-          throw new Error(`Failed to fetch work schedule: ${resWs.status}`);
-        }
-
-        const workScheduleJson = await resWs.json();
+        const monthEnd = getLastDateOfMonth(
+          new Date(toDate).getMonth() + 1,
+          new Date(toDate).getFullYear()
+        );
 
         const res = await fetchWithAuth(
           `${API_BASE_URL_TIMEKEEPING}/api/employee/dtr?employeeNo=${
@@ -110,22 +128,50 @@ export default function DTRPage() {
             fromDate
           )}&toDate=${encodeURIComponent(toDate)}`
         );
-        const dtrJson  = await res.json();
+        const dtrJson = await res.json();
 
-        // merge WorkSchedule shift code into DTR records
-        const mappedRecords: DTRRecord[] = dtrJson.map((record: DTRRecord) => {
-          const ws = workScheduleJson.find(
-            (schedule: WorkScheduleDTO) =>
-              toDateInputValueExplicit(schedule.wsDateTime) === toDateInputValueExplicit(record.dtrDate)
+        if (dtrJson.length > 0) {
+          const resWs = await fetchWithAuth(
+            `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule?employeeNo=${selectedEmployee.employeeNo}&monthStart=${monthStart}&monthEnd=${monthEnd}`
           );
 
-          return {
-            ...record,
-            shiftCode: ws ? ws.tsCode : "-", // add shiftCode if found, else fallback
-          };
-        });
-        
-        setRecords(mappedRecords);
+          let workScheduleJson = null;
+          if (resWs.ok && resWs.status !== 204) {
+            workScheduleJson = await resWs.json();
+          }
+
+          // merge WorkSchedule shift code into DTR records
+          const mappedRecords: DTRRecord[] = dtrJson.map(
+            (record: DTRRecord) => {
+              const ws = workScheduleJson.find(
+                (schedule: WorkScheduleDTO) =>
+                  toDateInputValueExplicit(schedule.wsDateTime) ===
+                  toDateInputValueExplicit(record.dtrDate)
+              );
+
+              return {
+                ...record,
+                shiftCode: ws ? ws.tsCode : "-", // add shiftCode if found, else fallback
+              };
+            }
+          );
+
+          setRecords(mappedRecords);
+        } else {
+          if (dtrJson.length == 0) {
+            Swal.fire({
+              title: "No Daily Time Record Found",
+              text: "There are no records available for the selected date.",
+              icon: "warning", // ✅ warning icon
+              confirmButtonText: "OK",
+              confirmButtonColor: "#d33", // optional: red confirm button
+            });
+            return;
+          }
+
+          setRecords(dtrJson);
+        }
+
         fetchTimeSfhit();
 
         console.log("Successfully fetch DTR employees", res.status);
@@ -141,7 +187,9 @@ export default function DTRPage() {
   //fetch All TimeShift from administrative db table
   const fetchTimeSfhit = async () => {
     try {
-      const res = await fetchWithAuth(`${API_BASE_URL_ADMINISTRATIVE}/api/getAll/time-shift`);
+      const res = await fetchWithAuth(
+        `${API_BASE_URL_ADMINISTRATIVE}/api/getAll/time-shift`
+      );
 
       if (!res.ok) {
         throw new Error(`Failed to fetch timeshifts: ${res.status}`);
@@ -168,25 +216,39 @@ export default function DTRPage() {
                 <input
                   id="employee"
                   type="text"
-                  list="employee-list"
+                  list={userRole === "ROLE_ADMIN" ? "employee-list" : undefined}
                   placeholder="Employee No / Lastname"
+                  value={
+                    userRole === "ROLE_ADMIN"
+                      ? inputValue // ✅ Admin can type freely
+                      : selectedEmployee
+                      ? `[${selectedEmployee.employeeNo}] ${selectedEmployee.fullName}`
+                      : ""
+                  }
+                  readOnly={userRole !== "ROLE_ADMIN"} // ✅ Non-admin can't edit
                   onChange={(e) => {
-                    const selected = employees.find(
-                      (emp) =>
-                        `[${emp.employeeNo}] ${emp.fullName}`.toLowerCase() ===
-                        e.target.value.toLowerCase()
-                    );
-                    setSelectedEmployee(selected || null);
+                    if (userRole === "ROLE_ADMIN") {
+                      setInputValue(e.target.value); // ✅ Track admin typing
+
+                      const selected = employees.find(
+                        (emp) =>
+                          `[${emp.employeeNo}] ${emp.fullName}`.toLowerCase() ===
+                          e.target.value.toLowerCase()
+                      );
+                      setSelectedEmployee(selected || null);
+                    }
                   }}
                 />
-                <datalist id="employee-list">
-                  {employees.map((emp) => (
-                    <option
-                      key={emp.employeeNo}
-                      value={`[${emp.employeeNo}] ${emp.fullName}`} //bear in mind if the value field was changed need to change also the onChange in input element
-                    />
-                  ))}
-                </datalist>
+                {userRole === "ROLE_ADMIN" && (
+                  <datalist id="employee-list">
+                    {employees.map((emp) => (
+                      <option
+                        key={emp.employeeNo}
+                        value={`[${emp.employeeNo}] ${emp.fullName}`}
+                      />
+                    ))}
+                  </datalist>
+                )}
               </div>
 
               <div className={styles.formGroup}>
@@ -217,7 +279,9 @@ export default function DTRPage() {
                 Search
               </button>
             </div>
-            {records.length > 0 && <DTRTable records={records} timeShifts={timeShift} />}
+            {records.length > 0 && (
+              <DTRTable records={records} timeShifts={timeShift} />
+            )}
           </div>
         </div>
       </div>
