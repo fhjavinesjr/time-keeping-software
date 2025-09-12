@@ -63,9 +63,47 @@ export default function DTRTable({ records, timeShifts }: Props) {
     setOpenRow(null);
   };
 
+  // Late = arrived after expected
+  const lateMinutes = (expected: string, actual: string) => {
+    if (!expected || !actual) return 0;
+    const [eh, em] = expected.split(":").map(Number);
+    const [ah, am] = actual.split(":").map(Number);
+    const expectedMin = eh * 60 + em;
+    const actualMin = ah * 60 + am;
+    return actualMin > expectedMin ? actualMin - expectedMin : 0;
+  };
+
+  // Undertime = left earlier than expected
+  const undertimeMinutes = (expected: string, actual: string) => {
+    if (!expected || !actual) return 0;
+    const [eh, em] = expected.split(":").map(Number);
+    const [ah, am] = actual.split(":").map(Number);
+    const expectedMin = eh * 60 + em;
+    const actualMin = ah * 60 + am;
+    return actualMin < expectedMin ? expectedMin - actualMin : 0;
+  };
+
   const handleShowDetails = (record: DTRRecord) => {
-    // find matching shift definition by tsCode
-    const matchedShift = timeShifts.find((ts) => ts.tsCode === record.shiftCode);
+    const matchedShift = timeShifts.find(
+      (ts) => ts.tsCode === record.shiftCode
+    );
+
+    let lateTimeIn = 0,
+      lateBreakIn = 0,
+      underTimeOut = 0,
+      underBreakOut = 0;
+
+    if (matchedShift) {
+      lateTimeIn = lateMinutes(matchedShift.timeIn, record.timeIn);
+      lateBreakIn = record.breakIn
+        ? lateMinutes(matchedShift.breakIn, record.breakIn)
+        : 0;
+
+      underTimeOut = undertimeMinutes(matchedShift.timeOut, record.timeOut);
+      underBreakOut = record.breakOut
+        ? undertimeMinutes(matchedShift.breakOut, record.breakOut)
+        : 0;
+    }
 
     Swal.fire({
       title: `DTR Details \n${record.workDate}`,
@@ -74,14 +112,32 @@ export default function DTRTable({ records, timeShifts }: Props) {
         <p><b>Shift Code:</b> ${record.shiftCode}</p>
         ${
           matchedShift
-            ? `
-              <p><b>Shift:</b> ${to12HourFormat(matchedShift.timeIn)+"-"}${matchedShift.breakOut!=null?to12HourFormat(matchedShift.breakOut)+"/":""}${matchedShift.breakIn!=null?to12HourFormat(matchedShift.breakIn)+"-":""}${to12HourFormat(matchedShift.timeOut)}</p>
-            `
+            ? `<p><b>Shift:</b> ${to12HourFormat(matchedShift.timeIn)} -
+                ${
+                  matchedShift.breakOut
+                    ? to12HourFormat(matchedShift.breakOut) + " / "
+                    : ""
+                }
+                ${
+                  matchedShift.breakIn
+                    ? to12HourFormat(matchedShift.breakIn) + " - "
+                    : ""
+                }
+                ${to12HourFormat(matchedShift.timeOut)}</p>`
             : `<p><i>No shift schedule found</i></p>`
         }
         <hr/>
-        <p><b>Late (mins):</b> ${record.lateMin || "0"}</p>
-        <p><b>Undertime (mins):</b> ${record.underMin || "0"}</p>
+        <h4>Late</h4>
+        <p>Time In (mins): ${lateTimeIn}</p>
+        <p>Break In (mins): ${lateBreakIn}</p>
+        <p><b>Total (mins): ${lateTimeIn + lateBreakIn}</b></p>
+        
+        <h4>Undertime</h4>
+        <p>Time Out (mins): ${underTimeOut}</p>
+        <p>Break Out (mins): ${underBreakOut}</p>
+        <p><b>Total (mins): ${underTimeOut + underBreakOut}</b></p>
+
+        <hr/>
         <p><b>Time Correction Filed:</b> ${
           record.timeCorrectionFiled ? "✅ Yes" : "❌ No"
         }</p>
@@ -94,7 +150,7 @@ export default function DTRTable({ records, timeShifts }: Props) {
     `,
       confirmButtonText: "Close",
       confirmButtonColor: "#3085d6",
-      width: "450px",
+      width: "480px",
     });
   };
 

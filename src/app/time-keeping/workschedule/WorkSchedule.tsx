@@ -250,6 +250,8 @@ export default function WorkSchedule() {
         if (!valid) return "Invalid shift code. Please select from the list.";
         return null;
       },
+      allowOutsideClick: true,       // let user click outside to close
+      returnFocus: false             // ✅ don't refocus input after close
     });
 
     if (tsCode) {
@@ -300,6 +302,8 @@ export default function WorkSchedule() {
         if (!valid) return "Invalid shift code. Please select from the list.";
         return null;
       },
+      allowOutsideClick: true,
+      returnFocus: false             // ✅ stops jumping to top
     });
 
     if (result.isConfirmed && result.value) {
