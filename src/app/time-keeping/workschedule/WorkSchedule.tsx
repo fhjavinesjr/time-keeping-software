@@ -22,8 +22,8 @@ const API_BASE_URL_ADMINISTRATIVE =
   process.env.NEXT_PUBLIC_API_BASE_URL_ADMINISTRATIVE;
 const API_BASE_URL_TIMEKEEPING =
   process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
-import to12HourFormat from '@/lib/utils/convert24To12HrFormat';
-import {WorkScheduleDTO} from '@/lib/types/WorkScheduleDTO';
+import to12HourFormat from "@/lib/utils/convert24To12HrFormat";
+import { WorkScheduleDTO } from "@/lib/types/WorkScheduleDTO";
 
 type ShiftEvent = {
   wsId: number;
@@ -115,7 +115,9 @@ export default function WorkSchedule() {
       const monthStart = getFirstDateOfMonth(month, year);
       const monthEnd = getLastDateOfMonth(month, year);
 
-      const res = await fetchWithAuth(`${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule?employeeNo=${employeeNo}&monthStart=${monthStart}&monthEnd=${monthEnd}`);
+      const res = await fetchWithAuth(
+        `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule?employeeNo=${employeeNo}&monthStart=${monthStart}&monthEnd=${monthEnd}`
+      );
 
       if (res.status === 204) {
         console.log("No work schedule found for this employee/month");
@@ -250,8 +252,8 @@ export default function WorkSchedule() {
         if (!valid) return "Invalid shift code. Please select from the list.";
         return null;
       },
-      allowOutsideClick: true,       // let user click outside to close
-      returnFocus: false             // ✅ don't refocus input after close
+      allowOutsideClick: true, // let user click outside to close
+      returnFocus: false, // ✅ don't refocus input after close
     });
 
     if (tsCode) {
@@ -303,11 +305,11 @@ export default function WorkSchedule() {
         return null;
       },
       allowOutsideClick: true,
-      returnFocus: false             // ✅ stops jumping to top
+      returnFocus: false, // ✅ stops jumping to top
     });
 
     if (result.isConfirmed && result.value) {
-      if(oldCode === result.value) {
+      if (oldCode === result.value) {
         return;
       }
       const success = await saveOrUpdateWorkSchedule(
@@ -326,7 +328,12 @@ export default function WorkSchedule() {
       const success = await deleteWorkSchedule(wsId);
       if (success) {
         setEvents((prev) => prev.filter((event) => event.date !== wsDateTime));
-        Swal.fire("Deleted!", "Shift removed from schedule.", "success");
+        Swal.fire({
+          title: "Deleted!",
+          text: "Shift removed from schedule.",
+          icon: "success",
+          returnFocus: false, // ✅ prevents scroll jump
+        });
       }
     }
   };
@@ -377,7 +384,14 @@ export default function WorkSchedule() {
                   <datalist id="shift-list">
                     {timeShift.map((shift) => (
                       <option key={shift.tsCode} value={shift.tsCode}>
-                        {to12HourFormat(shift.timeIn)+"-"}{shift.breakOut != null?to12HourFormat(shift.breakOut)+"/":''}{shift.breakIn != null?to12HourFormat(shift.breakIn)+"-":''}{to12HourFormat(shift.timeOut)}
+                        {to12HourFormat(shift.timeIn) + "-"}
+                        {shift.breakOut != null
+                          ? to12HourFormat(shift.breakOut) + "/"
+                          : ""}
+                        {shift.breakIn != null
+                          ? to12HourFormat(shift.breakIn) + "-"
+                          : ""}
+                        {to12HourFormat(shift.timeOut)}
                       </option>
                     ))}
                   </datalist>
@@ -400,7 +414,15 @@ export default function WorkSchedule() {
               <div className={styles.legendGrid}>
                 {timeShift.map((shift) => (
                   <div key={shift.tsCode} className={styles.legendItem}>
-                    <strong>{shift.tsCode}</strong> – {to12HourFormat(shift.timeIn)+"-"}{shift.breakOut != null?to12HourFormat(shift.breakOut)+"/":''}{shift.breakIn != null?to12HourFormat(shift.breakIn)+"-":''}{to12HourFormat(shift.timeOut)}
+                    <strong>{shift.tsCode}</strong> –{" "}
+                    {to12HourFormat(shift.timeIn) + "-"}
+                    {shift.breakOut != null
+                      ? to12HourFormat(shift.breakOut) + "/"
+                      : ""}
+                    {shift.breakIn != null
+                      ? to12HourFormat(shift.breakIn) + "-"
+                      : ""}
+                    {to12HourFormat(shift.timeOut)}
                   </div>
                 ))}
               </div>
@@ -414,8 +436,8 @@ export default function WorkSchedule() {
                 right: "",
               }}
               events={events}
-              dateClick={handleDateClick}
-              eventClick={handleEventClick} // ✅ Add this line
+              dateClick={userRole === "ROLE_ADMIN" ? handleDateClick : undefined}
+              eventClick={userRole === "ROLE_ADMIN" ? handleEventClick : undefined} // ✅ Add this line
               editable={false}
               selectable={true}
               height="auto"
@@ -429,10 +451,16 @@ export default function WorkSchedule() {
                     {shift && (
                       <div style={{ fontSize: "0.75em", lineHeight: "1.2" }}>
                         <div>
-                          {to12HourFormat(shift.timeIn)+'-'}{shift.breakOut != null?to12HourFormat(shift.breakOut):''}
+                          {to12HourFormat(shift.timeIn) + "-"}
+                          {shift.breakOut != null
+                            ? to12HourFormat(shift.breakOut)
+                            : ""}
                         </div>
                         <div>
-                          {shift.breakIn != null?to12HourFormat(shift.breakIn)+'-':''}{to12HourFormat(shift.timeOut)}
+                          {shift.breakIn != null
+                            ? to12HourFormat(shift.breakIn) + "-"
+                            : ""}
+                          {to12HourFormat(shift.timeOut)}
                         </div>
                       </div>
                     )}
