@@ -149,7 +149,7 @@ export default function DTRTable({ records, timeShifts }: Props) {
       </div>
     `,
       confirmButtonText: "Close",
-      confirmButtonColor: "#3085d6",
+      confirmButtonColor: "#495057",
       width: "480px",
     });
   };
