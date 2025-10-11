@@ -62,6 +62,7 @@ export default function LoginPage() {
       const currentEmp = employees.find(emp => emp.employeeNo === employeeNo);
 
       if (currentEmp) {
+        localStorageUtil.setEmployeeId(currentEmp.employeeId); // Store employeeId
         localStorageUtil.setEmployeeNo(currentEmp.employeeNo); // Store employeeNo
         localStorageUtil.setEmployeeFullname(currentEmp.fullName); // Store fullname
         localStorageUtil.setEmployeeRole(currentEmp.role);

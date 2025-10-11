@@ -53,6 +53,7 @@ export default function WorkSchedule() {
   useEffect(() => {
     const role = localStorageUtil.getEmployeeRole();
     const employeeNo = localStorageUtil.getEmployeeNo();
+    const employeeId = localStorageUtil.getEmployeeId();
 
     setUserRole(role);
 
@@ -68,14 +69,14 @@ export default function WorkSchedule() {
     fetchTimeShifts();
 
     const today = new Date();
-    fetchAllWorkSchedule(employeeNo, today.getFullYear(), today.getMonth() + 1);
+    fetchAllWorkSchedule(employeeId, today.getFullYear(), today.getMonth() + 1);
   }, []);
 
   useEffect(() => {
     if (selectedEmployee) {
       const today = new Date();
       fetchAllWorkSchedule(
-        selectedEmployee.employeeNo,
+        selectedEmployee.employeeId,
         today.getFullYear(),
         today.getMonth() + 1
       );
@@ -106,7 +107,7 @@ export default function WorkSchedule() {
 
   // Fetch All Work Schedule by Selected employee (page load)
   const fetchAllWorkSchedule = async (
-    employeeNo: string | null,
+    employeeId: string | null,
     year: number,
     month: number
   ) => {
@@ -116,7 +117,7 @@ export default function WorkSchedule() {
       const monthEnd = getLastDateOfMonth(month, year);
 
       const res = await fetchWithAuth(
-        `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule?employeeNo=${employeeNo}&monthStart=${monthStart}&monthEnd=${monthEnd}`
+        `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule?employeeId=${employeeId}&monthStart=${monthStart}&monthEnd=${monthEnd}`
       );
 
       if (res.status === 204) {
@@ -146,7 +147,7 @@ export default function WorkSchedule() {
   };
 
   const saveOrUpdateWorkSchedule = async (
-    employeeNo: string,
+    employeeId: string,
     tsCode: string | null,
     wsDateTime: string,
     wsId?: number // optional
@@ -163,7 +164,7 @@ export default function WorkSchedule() {
       const res = await fetchWithAuth(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employeeNo, tsCode, wsDateTime }),
+        body: JSON.stringify({ employeeId, tsCode, wsDateTime }),
       });
 
       if (!res.ok) {
@@ -175,7 +176,7 @@ export default function WorkSchedule() {
 
       console.log("Work schedule saved/updated:", {
         wsId,
-        employeeNo,
+        employeeId,
         tsCode,
         wsDateTime,
       });
@@ -259,7 +260,7 @@ export default function WorkSchedule() {
     if (tsCode) {
       // Save to backend
       const success = await saveOrUpdateWorkSchedule(
-        selectedEmployee.employeeNo,
+        selectedEmployee.employeeId,
         tsCode,
         arg.dateStr
       );
@@ -313,7 +314,7 @@ export default function WorkSchedule() {
         return;
       }
       const success = await saveOrUpdateWorkSchedule(
-        selectedEmployee.employeeNo,
+        selectedEmployee.employeeId,
         result.value,
         wsDateTime,
         wsId
@@ -472,7 +473,7 @@ export default function WorkSchedule() {
                   const year = arg.start.getFullYear();
                   const month = arg.start.getMonth() + 2; // 0-based
                   fetchAllWorkSchedule(
-                    selectedEmployee.employeeNo,
+                    selectedEmployee.employeeId,
                     year,
                     month
                   );

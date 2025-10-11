@@ -74,11 +74,12 @@ export default function DTRPage() {
     const role = localStorageUtil.getEmployeeRole();
     const fullname = localStorageUtil.getEmployeeFullname();
     const empNo = localStorageUtil.getEmployeeNo();
+    const employeeId = localStorageUtil.getEmployeeId();
 
     setUserRole(role);
 
     if (fullname && empNo) {
-      const emp = { employeeNo: empNo, fullName: fullname } as Employee;
+      const emp = { employeeId: employeeId, employeeNo: empNo, fullName: fullname } as Employee;
       setSelectedEmployee(emp);
 
       if (role === "ROLE_ADMIN") {
@@ -122,8 +123,8 @@ export default function DTRPage() {
         );
 
         const res = await fetchWithAuth(
-          `${API_BASE_URL_TIMEKEEPING}/api/employee/dtr?employeeNo=${
-            selectedEmployee.employeeNo
+          `${API_BASE_URL_TIMEKEEPING}/api/employee/dtr?employeeId=${
+            selectedEmployee.employeeId
           }&fromDate=${encodeURIComponent(
             fromDate
           )}&toDate=${encodeURIComponent(toDate)}`
@@ -132,7 +133,7 @@ export default function DTRPage() {
 
         if (dtrJson.length > 0) {
           const resWs = await fetchWithAuth(
-            `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule?employeeNo=${selectedEmployee.employeeNo}&monthStart=${monthStart}&monthEnd=${monthEnd}`
+            `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule?employeeId=${selectedEmployee.employeeId}&monthStart=${monthStart}&monthEnd=${monthEnd}`
           );
 
           let workScheduleJson = null;

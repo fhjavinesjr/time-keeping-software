@@ -17,7 +17,10 @@ export const localStorageUtil = {
   },
   clearEmployees: () => localStorage.removeItem("employees"),
 
-  // Current employeeNo & name
+  // Current employeeId, employeeNo & name
+  setEmployeeId: (employeeId: string) => localStorage.setItem("employeeId", employeeId),
+  getEmployeeId: () => localStorage.getItem("employeeId"),
+
   setEmployeeNo: (employeeNo: string) => localStorage.setItem("employeeNo", employeeNo),
   setEmployeeFullname: (fullname: string) => localStorage.setItem("employeeFullname", fullname),
   getEmployeeNo: () => localStorage.getItem("employeeNo"),
