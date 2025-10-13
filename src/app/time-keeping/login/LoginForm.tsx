@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation"; //use next/navigation if the page i
 import { localStorageUtil } from "@/lib/utils/localStorageUtil";
 import { fetchWithAuth } from "@/lib/utils/fetchWithAuth";
 import { Employee } from '@/lib/types/Employee';
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL_HRM;
 
 export default function LoginPage() {
   const router = useRouter();
