@@ -351,7 +351,7 @@ export default function WorkSchedule() {
             {/* ✅ Employee Name field */}
             <div className={styles.formGroup}>
               <label htmlFor="employee">Employee Name&nbsp;</label>
-              {userRole === "ROLE_ADMIN" ? (
+              {userRole === "1" ? (
                 <>
                   <input
                     id="employee"
@@ -437,8 +437,8 @@ export default function WorkSchedule() {
                 right: "",
               }}
               events={events}
-              dateClick={userRole === "ROLE_ADMIN" ? handleDateClick : undefined}
-              eventClick={userRole === "ROLE_ADMIN" ? handleEventClick : undefined} // ✅ Add this line
+              dateClick={userRole === "1" ? handleDateClick : undefined}
+              eventClick={userRole === "1" ? handleEventClick : undefined} // ✅ Add this line
               editable={false}
               selectable={true}
               height="auto"
