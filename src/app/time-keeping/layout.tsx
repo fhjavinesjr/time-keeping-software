@@ -2,6 +2,9 @@
 
 import type { Metadata } from "next";
 import './globals.css';
+import React from "react";
+import LayoutClientWrapper from "./layoutClientWrapper";
+import PageAuthentication from "./PageAuthentication";
 
 export const metadata: Metadata = {
   title: "Time Keeping",
@@ -16,7 +19,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="Time-Keeping" >
-        {children}
+        
+        <PageAuthentication>
+          <LayoutClientWrapper>
+            {children}
+          </LayoutClientWrapper>
+        </PageAuthentication>
+        
       </body>
     </html>
   );

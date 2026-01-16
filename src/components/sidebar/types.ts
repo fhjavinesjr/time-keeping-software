@@ -1,7 +1,7 @@
 export interface MenuItemProps {
   icon: string;
   label: string;
-  goto: string;
+  goto?: string;
   isActive?: boolean;
   onClick: () => void;
 }

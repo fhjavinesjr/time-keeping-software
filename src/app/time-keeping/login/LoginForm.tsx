@@ -11,6 +11,10 @@ import { useRouter } from "next/navigation"; //use next/navigation if the page i
 import { localStorageUtil } from "@/lib/utils/localStorageUtil";
 import { fetchWithAuth } from "@/lib/utils/fetchWithAuth";
 import { Employee } from '@/lib/types/Employee';
+import { setCookie } from "@/lib/utils/cookies";
+import { AUTH_CONFIG } from "@/lib/utils/authConfig";
+
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL_HRM;
 
 export default function LoginPage() {
@@ -25,6 +29,8 @@ export default function LoginPage() {
     try {
       const employeeNo = formData.get("employeeNo") as string;
       const employeePassword = formData.get("employeePassword") as string;
+
+      
 
       // Login
       const response = await fetch(`${API_BASE_URL}/api/employee/login`, {
@@ -43,8 +49,21 @@ export default function LoginPage() {
         return;
       }
 
+      // Store token
       const token = await response.text();
-      localStorageUtil.set(token); // Store authToken
+      localStorageUtil.set(token);
+
+      // Set cookies and localStorage for session persistence
+      const now = Date.now();
+      const COOKIE_EXPIRY = AUTH_CONFIG.INACTIVITY_LIMIT; // in seconds
+
+      setCookie(AUTH_CONFIG.COOKIE.IS_LOGGED_IN, "true", COOKIE_EXPIRY);
+      setCookie(AUTH_CONFIG.COOKIE.LAST_ACTIVITY, now.toString(), COOKIE_EXPIRY);
+
+      localStorage.setItem(AUTH_CONFIG.COOKIE.IS_LOGGED_IN, "true");
+      localStorage.setItem(AUTH_CONFIG.COOKIE.LAST_ACTIVITY, now.toString());
+
+  
 
       // Fetch employees
       const empRes = await fetchWithAuth(
@@ -78,7 +97,7 @@ export default function LoginPage() {
         backdrop: true,
       }).then((result) => {
         if (result.isConfirmed) {
-          router.push("/time-keeping/dashboard");
+          router.replace("/time-keeping/dashboard");
         }
       });
     } catch (error) {
