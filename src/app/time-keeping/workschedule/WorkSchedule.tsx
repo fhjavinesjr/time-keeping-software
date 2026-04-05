@@ -37,6 +37,7 @@ type TimeShift = {
   breakOut: string;
   breakIn: string;
   timeOut: string;
+  tsName?: string; // Optional, for tooltip
 };
 
 export default function WorkSchedule() {
@@ -224,18 +225,58 @@ export default function WorkSchedule() {
     }
   };
 
-  //Assign/Create Work Schedule
+  // Utility: Parse time string (HH:mm) to minutes
+  const parseTime = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
+
+  // Utility: Get shift start/end in minutes, handling overnight
+  const getShiftRange = (shift: TimeShift) => {
+    const start = parseTime(shift.timeIn);
+    let end = parseTime(shift.timeOut);
+    if (end <= start) end += 24 * 60; // overnight or 24hr shift
+    return [start, end];
+  };
+
+  // Utility: Get all events for a date
+  const getEventsForDate = (dateStr: string) => events.filter(e => e.date === dateStr);
+
+  // Utility: Get shift by code
+  const getShiftByCode = (code: string) => timeShift.find(s => s.tsCode === code);
+
+
+  // Utility: Check overlap (with type safety, handles overnight)
+  const isOverlapping = (newShift: TimeShift, existingShifts: TimeShift[]): boolean => {
+    if (!newShift || !newShift.timeIn || !newShift.timeOut) return false;
+    const [newStart, newEnd] = getShiftRange(newShift);
+    return existingShifts.filter(Boolean).some(s => {
+      if (!s || !s.timeIn || !s.timeOut) return false;
+      const [sStart, sEnd] = getShiftRange(s);
+      return (newStart < sEnd && newEnd > sStart); // overlap
+    });
+  };
+
+  // Utility: Get total minutes for all shifts (with type safety, handles overnight)
+  const getTotalMinutes = (shifts: TimeShift[]): number =>
+    shifts.filter(Boolean).reduce((sum, s) => {
+      if (!s || !s.timeIn || !s.timeOut) return sum;
+      const [start, end] = getShiftRange(s);
+      return sum + (end - start);
+    }, 0);
+
+  // Assign/Create Work Schedule (multiple shifts per day, no overlap, max 24h)
   const handleDateClick = async (arg: DateClickArg) => {
     if (!selectedEmployee) {
       Swal.fire("Warning", "Please select an employee first.", "warning");
       return;
     }
 
-    // 🔒 Prevent assigning if the day already has a shift
-    const alreadyAssigned = events.some((event) => event.date === arg.dateStr);
-    if (alreadyAssigned) {
-      return;
-    }
+    const dayEvents = getEventsForDate(arg.dateStr);
+    // Only include valid shift objects
+    const dayShifts = dayEvents
+      .map(e => getShiftByCode(e.title))
+      .filter((s): s is TimeShift => !!s);
 
     const { value: tsCode } = await Swal.fire({
       title: `Enter shift code for ${arg.dateStr}`,
@@ -249,12 +290,19 @@ export default function WorkSchedule() {
       confirmButtonText: "Assign",
       inputValidator: (value) => {
         if (!value) return "You need to enter a shift code!";
-        const valid = timeShift.some((shift) => shift.tsCode === value);
-        if (!valid) return "Invalid shift code. Please select from the list.";
+        const shift = getShiftByCode(value);
+        if (!shift) return "Invalid shift code. Please select from the list.";
+        // Duplicate check
+        if (dayEvents.some(e => e.title === value)) return "This shift code is already assigned for this day.";
+        // Overlap check (robust)
+        if (isOverlapping(shift, dayShifts)) return "Shift overlaps with existing shift.";
+        // 24h check (robust)
+        const total = getTotalMinutes([...dayShifts, shift]);
+        if (total > 24 * 60) return "Total shift hours exceed 24 hours.";
         return null;
       },
-      allowOutsideClick: true, // let user click outside to close
-      returnFocus: false, // ✅ don't refocus input after close
+      allowOutsideClick: true,
+      returnFocus: false,
     });
 
     if (tsCode) {
@@ -266,7 +314,7 @@ export default function WorkSchedule() {
       );
       if (success) {
         setEvents((prev) => [
-          ...prev.filter((event) => event.date !== arg.dateStr),
+          ...prev,
           { wsId: success.metaId, title: tsCode, date: arg.dateStr },
         ]);
       }
@@ -328,7 +376,7 @@ export default function WorkSchedule() {
     } else if (result.isDenied) {
       const success = await deleteWorkSchedule(wsId);
       if (success) {
-        setEvents((prev) => prev.filter((event) => event.date !== wsDateTime));
+        setEvents((prev) => prev.filter((event) => event.wsId !== wsId));
         Swal.fire({
           title: "Deleted!",
           text: "Shift removed from schedule.",
@@ -409,13 +457,26 @@ export default function WorkSchedule() {
                 />
               )}
             </div>
-            {/* 🔻 Time Shift Legend */}
+            {/* 🔻 Time Shift Legend with Tooltip */}
             <div className={styles.legend}>
               <h3>Legend</h3>
               <div className={styles.legendGrid}>
                 {timeShift.map((shift) => (
                   <div key={shift.tsCode} className={styles.legendItem}>
-                    <strong>{shift.tsCode}</strong> –{" "}
+                    <span
+                      title={shift.tsName || ''}
+                      style={{
+                        cursor: 'help',
+                        borderBottom: '1px dotted #888',
+                        padding: '2px 4px',
+                        borderRadius: '3px',
+                        background: '#f9f9f9',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      {shift.tsCode}
+                    </span>
+                    {" – "}
                     {to12HourFormat(shift.timeIn) + "-"}
                     {shift.breakOut != null
                       ? to12HourFormat(shift.breakOut) + "/"
