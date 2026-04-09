@@ -1,212 +1,212 @@
-// src/app/time-keeping/dtr/DTRTable.tsx
-import { useState, useRef, useEffect } from "react";
-import Swal from "sweetalert2";
+import React, { useState } from "react";
 import styles from "@/styles/DTRTable.module.scss";
 import to12HourFormat from "@/lib/utils/convert24To12HrFormat";
+import {
+  getNextWorkDate,
+  hasOvernightSegments,
+  isOvernightSegment,
+  toWorkDateOnly,
+} from "@/lib/utils/dtrSegmentUtils";
 
-type DTRRecord = {
-  workDate: string;
-  shiftCode: string;
-  shift: string;
-  timeIn: string;
-  breakOut: string;
-  breakIn: string;
-  timeOut: string;
-  details?: string;
-  lateMin: string;
-  underMin: string;
-  timeCorrectionFiled?: boolean;
-  overtimeFiled?: boolean;
-  leaveFiled?: boolean;
+type DTRSegmentDTO = {
+  dtrSegmentId: number;
+  segmentNo: number;
+  timeIn: string | null;
+  breakOut: string | null;
+  breakIn: string | null;
+  timeOut: string | null;
+  isOvernightShift?: boolean;
+  workMinutes: number;
+  lateMinutes: number;
+  undertimeMinutes: number;
+  overtimeMinutes: number;
 };
 
-type TimeShift = {
-  tsCode: string;
-  timeIn: string;
-  breakOut: string;
-  breakIn: string;
-  timeOut: string;
+type DTRDailyDTO = {
+  dtrDailyId: number;
+  employeeId: string;
+  workDate: string;
+  totalWorkMinutes: number;
+  totalLateMinutes: number;
+  totalUndertimeMinutes: number;
+  totalOvertimeMinutes: number;
+  attendanceStatus: string;
+  segments: DTRSegmentDTO[];
 };
 
 type Props = {
-  records: DTRRecord[];
-  timeShifts: TimeShift[];
+  records: DTRDailyDTO[];
 };
 
-export default function DTRTable({ records, timeShifts }: Props) {
-  const [openRow, setOpenRow] = useState<number | null>(null);
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
+const formatDate = (dateStr: string) => {
+  // Expects MM-dd-yyyy HH:mm:ss, returns MM-dd-yyyy
+  return toWorkDateOnly(dateStr);
+};
+const formatTime = (timeStr: string) => {
+  // Expects HH:mm:ss, returns HH:mm:ss AM/PM
+  return timeStr ? to12HourFormat(timeStr) : "";
+};
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setOpenRow(null);
-      }
-    };
+const getStatusClass = (status: string) => {
+  const normalized = status.toLowerCase();
 
-    if (openRow !== null) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
+  if (normalized.includes("present")) return styles.statusPresent;
+  if (normalized.includes("late")) return styles.statusLate;
+  if (normalized.includes("absent")) return styles.statusAbsent;
 
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [openRow]);
+  return styles.statusDefault;
+};
 
-  const handleTimeCorrection = (record: DTRRecord) => {
-    console.log("Time correction for", record.workDate);
-    // open modal form for correction
-    setOpenRow(null);
-  };
+export default function DTRTable({ records }: Props) {
+  const [expanded, setExpanded] = useState<number | null>(null);
 
-  // Late = arrived after expected
-  const lateMinutes = (expected: string, actual: string) => {
-    if (!expected || !actual) return 0;
-    const [eh, em] = expected.split(":").map(Number);
-    const [ah, am] = actual.split(":").map(Number);
-    const expectedMin = eh * 60 + em;
-    const actualMin = ah * 60 + am;
-    return actualMin > expectedMin ? actualMin - expectedMin : 0;
-  };
-
-  // Undertime = left earlier than expected
-  const undertimeMinutes = (expected: string, actual: string) => {
-    if (!expected || !actual) return 0;
-    const [eh, em] = expected.split(":").map(Number);
-    const [ah, am] = actual.split(":").map(Number);
-    const expectedMin = eh * 60 + em;
-    const actualMin = ah * 60 + am;
-    return actualMin < expectedMin ? expectedMin - actualMin : 0;
-  };
-
-  const handleShowDetails = (record: DTRRecord) => {
-    const matchedShift = timeShifts.find(
-      (ts) => ts.tsCode === record.shiftCode
-    );
-
-    let lateTimeIn = 0,
-      lateBreakIn = 0,
-      underTimeOut = 0,
-      underBreakOut = 0;
-
-    if (matchedShift) {
-      lateTimeIn = lateMinutes(matchedShift.timeIn, record.timeIn);
-      lateBreakIn = record.breakIn
-        ? lateMinutes(matchedShift.breakIn, record.breakIn)
-        : 0;
-
-      underTimeOut = undertimeMinutes(matchedShift.timeOut, record.timeOut);
-      underBreakOut = record.breakOut
-        ? undertimeMinutes(matchedShift.breakOut, record.breakOut)
-        : 0;
-    }
-
-    Swal.fire({
-      title: `DTR Details \n${record.workDate}`,
-      html: `
-      <div style="text-align:left; font-size:14px;">
-        <p><b>Shift Code:</b> ${record.shiftCode}</p>
-        ${
-          matchedShift
-            ? `<p><b>Shift:</b> ${to12HourFormat(matchedShift.timeIn)} -
-                ${
-                  matchedShift.breakOut
-                    ? to12HourFormat(matchedShift.breakOut) + " / "
-                    : ""
-                }
-                ${
-                  matchedShift.breakIn
-                    ? to12HourFormat(matchedShift.breakIn) + " - "
-                    : ""
-                }
-                ${to12HourFormat(matchedShift.timeOut)}</p>`
-            : `<p><i>No shift schedule found</i></p>`
-        }
-        <hr/>
-        <h4>Late</h4>
-        <p>Time In (mins): ${lateTimeIn}</p>
-        <p>Break In (mins): ${lateBreakIn}</p>
-        <p><b>Total (mins): ${lateTimeIn + lateBreakIn}</b></p>
-        
-        <h4>Undertime</h4>
-        <p>Time Out (mins): ${underTimeOut}</p>
-        <p>Break Out (mins): ${underBreakOut}</p>
-        <p><b>Total (mins): ${underTimeOut + underBreakOut}</b></p>
-
-        <hr/>
-        <p><b>Time Correction Filed:</b> ${
-          record.timeCorrectionFiled ? "✅ Yes" : "❌ No"
-        }</p>
-        <p><b>Overtime Filed:</b> ${
-          record.overtimeFiled ? "✅ Yes" : "❌ No"
-        }</p>
-        <p><b>Leave Filed:</b> ${record.leaveFiled ? "✅ Yes" : "❌ No"}</p>
-        <p><b>Notes:</b> ${record.details || "—"}</p>
-      </div>
-    `,
-      confirmButtonText: "Close",
-      confirmButtonColor: "#495057",
-      width: "480px",
-    });
+  const handleExpand = (idx: number) => {
+    setExpanded(expanded === idx ? null : idx);
   };
 
   return (
-    <div className={styles.DTRTable}>
-      <table className={styles.table}>
+    <div className={styles.tableContainer}>
+      <table className={styles.summaryTable}>
         <thead>
           <tr>
-            <th>Work Date</th>
-            <th>Shift</th>
-            <th>Time In</th>
-            <th>Break Out</th>
-            <th>Break In</th>
-            <th>Time Out</th>
-            <th>Details</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {records.map((record, index) => (
-            <tr key={index}>
-              <td>{record.workDate}</td>
-              <td>{record.shiftCode}</td>
-              <td>{to12HourFormat(record.timeIn)}</td>
-              <td>{record.breakOut ? to12HourFormat(record.breakOut) : "—"}</td>
-              <td>{record.breakIn ? to12HourFormat(record.breakIn) : "—"}</td>
-              <td>{to12HourFormat(record.timeOut)}</td>
-              <td>
-                <button
-                  className={styles.detailButton}
-                  onClick={() => handleShowDetails(record)}
-                >
-                  📋 View
-                </button>
-              </td>
-              <td>
-                <div className={styles.actions} ref={dropdownRef}>
-                  <button
-                    className={styles.actionButton}
-                    onClick={() => setOpenRow(openRow === index ? null : index)}
-                  >
-                    ⋮
-                  </button>
-                  {openRow === index && (
-                    <div className={styles.dropdown}>
-                      <button onClick={() => handleTimeCorrection(record)}>
-                        ✏️ Time Correction
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </td>
+              <th>Date</th>
+              <th>Status</th>
+              <th>Work Min</th>
+              <th>Late</th>
+              <th>Under</th>
+              <th>Over</th>
+              <th>Segments</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {records.map((rec, idx) => (
+              <React.Fragment key={rec.dtrDailyId}>
+                <tr>
+                  <td>
+                    <div className={styles.workDateCell}>
+                      <span>{formatDate(rec.workDate)}</span>
+                      {hasOvernightSegments(rec.segments) && (
+                        <span className={styles.workDateHint}>
+                          {`${formatDate(rec.workDate)} -> ${getNextWorkDate(
+                            rec.workDate
+                          )}`}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td>
+                    <span
+                      className={`${styles.statusBadge} ${getStatusClass(
+                        rec.attendanceStatus
+                      )}`}
+                    >
+                      {rec.attendanceStatus}
+                    </span>
+                  </td>
+                  <td>{rec.totalWorkMinutes}</td>
+                  <td>{rec.totalLateMinutes}</td>
+                  <td>{rec.totalUndertimeMinutes}</td>
+                  <td>{rec.totalOvertimeMinutes}</td>
+                  <td>
+                    <button
+                      className={styles.segmentToggleButton}
+                      aria-label={expanded === idx ? "Hide segments" : "Show segments"}
+                      onClick={() => handleExpand(idx)}
+                    >
+                      {expanded === idx ? "Hide" : "Show"}
+                    </button>
+                  </td>
+                </tr>
+                {expanded === idx && (
+                  <tr>
+                    <td className={styles.segmentCell} colSpan={7}>
+                      <div className={styles.segmentPanel}>
+                        <table className={styles.segmentTable}>
+                          <thead>
+                            <tr>
+                              <th>Segment</th>
+                              <th>Time In</th>
+                              <th>Break Out</th>
+                              <th>Break In</th>
+                              <th>Time Out</th>
+                              <th>
+                                <span className={styles.headerWithHelp}>
+                                  Type
+                                  <span
+                                    className={styles.helpIcon}
+                                    title="Overnight means Time Out occurred on the next calendar day."
+                                    aria-label="Overnight means Time Out occurred on the next calendar day."
+                                  >
+                                    i
+                                  </span>
+                                </span>
+                              </th>
+                              <th>Work</th>
+                              <th>Late</th>
+                              <th>Under</th>
+                              <th>Over</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rec.segments && rec.segments.length > 0 ? (
+                              rec.segments.map((seg) => {
+                                const overnight = isOvernightSegment(seg);
+
+                                return (
+                                  <tr key={seg.dtrSegmentId}>
+                                    <td>{seg.segmentNo}</td>
+                                    <td>{formatTime(seg.timeIn ?? "")}</td>
+                                    <td>{formatTime(seg.breakOut ?? "")}</td>
+                                    <td>{formatTime(seg.breakIn ?? "")}</td>
+                                    <td>
+                                      <span className={styles.timeOutCell}>
+                                        {formatTime(seg.timeOut ?? "")}
+                                        {overnight && (
+                                          <span className={styles.nextDayMarker}>
+                                            (+1 day)
+                                          </span>
+                                        )}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      {overnight ? (
+                                        <span
+                                          className={`${styles.segmentTypeBadge} ${styles.segmentTypeOvernight}`}
+                                        >
+                                          Overnight
+                                        </span>
+                                      ) : (
+                                        <span
+                                          className={`${styles.segmentTypeBadge} ${styles.segmentTypeSameDay}`}
+                                        >
+                                          Same day
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td>{seg.workMinutes}</td>
+                                    <td>{seg.lateMinutes}</td>
+                                    <td>{seg.undertimeMinutes}</td>
+                                    <td>{seg.overtimeMinutes}</td>
+                                  </tr>
+                                );
+                              })
+                            ) : (
+                              <tr>
+                                <td className={styles.noSegments} colSpan={10}>
+                                  No segments
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
   );
 }

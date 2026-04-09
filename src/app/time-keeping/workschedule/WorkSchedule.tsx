@@ -14,7 +14,6 @@ import Swal from "sweetalert2";
 import { fetchWithAuth } from "@/lib/utils/fetchWithAuth";
 import {
   toDateInputValue,
-  toCustomFormat,
   getFirstDateOfMonth,
   getLastDateOfMonth,
 } from "@/lib/utils/dateFormatUtils";
@@ -24,6 +23,7 @@ const API_BASE_URL_TIMEKEEPING =
   process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
 import to12HourFormat from "@/lib/utils/convert24To12HrFormat";
 import { WorkScheduleDTO } from "@/lib/types/WorkScheduleDTO";
+import { format, parseISO } from "date-fns";
 
 type ShiftEvent = {
   wsId: number;
@@ -150,11 +150,15 @@ export default function WorkSchedule() {
   const saveOrUpdateWorkSchedule = async (
     employeeId: string,
     tsCode: string | null,
-    wsDateTime: string,
+    workDate: string,
     wsId?: number // optional
   ) => {
     try {
-      wsDateTime = toCustomFormat(wsDateTime, true);
+      if (!tsCode) {
+        throw new Error("Time shift code is required.");
+      }
+
+      const wsDateTime = buildWsDateTime(workDate, tsCode);
 
       const url = wsId
         ? `${API_BASE_URL_TIMEKEEPING}/api/update/work-schedule/${wsId}` // ✅ update
@@ -192,6 +196,25 @@ export default function WorkSchedule() {
       );
       return false;
     }
+  };
+
+  const normalizeWorkDate = (workDate: string) => {
+    if (!workDate) return workDate;
+    if (workDate.includes("T")) return workDate.split("T")[0];
+    if (workDate.includes(" ")) return workDate.split(" ")[0];
+    return workDate;
+  };
+
+  const buildWsDateTime = (workDate: string, tsCode: string) => {
+    const shift = getShiftByCode(tsCode);
+    if (!shift) {
+      throw new Error(`Time shift not found for code: ${tsCode}`);
+    }
+
+    const normalizedWorkDate = normalizeWorkDate(workDate);
+    const isoDateTime = `${normalizedWorkDate}T${shift.timeIn}`;
+
+    return format(parseISO(isoDateTime), "MM-dd-yyyy HH:mm:ss");
   };
 
   const deleteWorkSchedule = async (wsId?: number) => {
@@ -239,11 +262,33 @@ export default function WorkSchedule() {
     return [start, end];
   };
 
+  const normalizeShiftCode = (code: string) => code.trim().toUpperCase();
+
   // Utility: Get all events for a date
-  const getEventsForDate = (dateStr: string) => events.filter(e => e.date === dateStr);
+  const getEventsForDate = (dateStr: string, excludedWsId?: number) =>
+    events.filter(
+      (event) => event.date === dateStr && event.wsId !== excludedWsId
+    );
 
   // Utility: Get shift by code
-  const getShiftByCode = (code: string) => timeShift.find(s => s.tsCode === code);
+  const getShiftByCode = (code: string) => {
+    const normalizedCode = normalizeShiftCode(code);
+    return timeShift.find(
+      (shift) => normalizeShiftCode(shift.tsCode) === normalizedCode
+    );
+  };
+
+  const hasDuplicateShiftCode = (
+    dateStr: string,
+    shiftCode: string,
+    excludedWsId?: number
+  ) => {
+    const normalizedCode = normalizeShiftCode(shiftCode);
+
+    return getEventsForDate(dateStr, excludedWsId).some(
+      (event) => normalizeShiftCode(event.title) === normalizedCode
+    );
+  };
 
 
   // Utility: Check overlap (with type safety, handles overnight)
@@ -293,7 +338,9 @@ export default function WorkSchedule() {
         const shift = getShiftByCode(value);
         if (!shift) return "Invalid shift code. Please select from the list.";
         // Duplicate check
-        if (dayEvents.some(e => e.title === value)) return "This shift code is already assigned for this day.";
+        if (hasDuplicateShiftCode(arg.dateStr, value)) {
+          return "This shift code is already assigned for this day.";
+        }
         // Overlap check (robust)
         if (isOverlapping(shift, dayShifts)) return "Shift overlaps with existing shift.";
         // 24h check (robust)
@@ -306,16 +353,21 @@ export default function WorkSchedule() {
     });
 
     if (tsCode) {
+      const shift = getShiftByCode(tsCode);
+      if (!shift) {
+        return;
+      }
+
       // Save to backend
       const success = await saveOrUpdateWorkSchedule(
         selectedEmployee.employeeId,
-        tsCode,
+        shift.tsCode,
         arg.dateStr
       );
       if (success) {
         setEvents((prev) => [
           ...prev,
-          { wsId: success.metaId, title: tsCode, date: arg.dateStr },
+          { wsId: success.metaId, title: shift.tsCode, date: arg.dateStr },
         ]);
       }
     }
@@ -332,6 +384,10 @@ export default function WorkSchedule() {
     const wsId = (clickInfo.event.extendedProps as ShiftEvent).wsId;
     const oldCode = clickInfo.event.title;
     const wsDateTime = clickInfo.event.startStr;
+    const dayEvents = getEventsForDate(wsDateTime, wsId);
+    const dayShifts = dayEvents
+      .map((event) => getShiftByCode(event.title))
+      .filter((shift): shift is TimeShift => !!shift);
 
     const result = await Swal.fire({
       title: `Update shift code for ${wsDateTime}`,
@@ -349,8 +405,16 @@ export default function WorkSchedule() {
         if (Swal.getConfirmButton()?.getAttribute("aria-disabled") === "true")
           return null;
         if (!value) return "You need to enter a shift code!";
-        const valid = timeShift.some((shift) => shift.tsCode === value);
-        if (!valid) return "Invalid shift code. Please select from the list.";
+        const shift = getShiftByCode(value);
+        if (!shift) return "Invalid shift code. Please select from the list.";
+        if (hasDuplicateShiftCode(wsDateTime, value, wsId)) {
+          return "This shift code is already assigned for this day.";
+        }
+        if (isOverlapping(shift, dayShifts)) {
+          return "Shift overlaps with existing shift.";
+        }
+        const total = getTotalMinutes([...dayShifts, shift]);
+        if (total > 24 * 60) return "Total shift hours exceed 24 hours.";
         return null;
       },
       allowOutsideClick: true,
@@ -358,20 +422,28 @@ export default function WorkSchedule() {
     });
 
     if (result.isConfirmed && result.value) {
-      if (oldCode === result.value) {
+      const shift = getShiftByCode(result.value);
+      if (!shift) {
+        return;
+      }
+
+      if (normalizeShiftCode(oldCode) === normalizeShiftCode(shift.tsCode)) {
         return;
       }
       const success = await saveOrUpdateWorkSchedule(
         selectedEmployee.employeeId,
-        result.value,
+        shift.tsCode,
         wsDateTime,
         wsId
       );
       if (success) {
-        setEvents((prev) => [
-          ...prev.filter((event) => event.date !== wsDateTime),
-          { wsId: wsId, title: result.value, date: wsDateTime },
-        ]);
+        // Re-fetch all work schedules for the current employee and month
+        const dateObj = new Date(wsDateTime);
+        fetchAllWorkSchedule(
+          selectedEmployee.employeeId,
+          dateObj.getFullYear(),
+          dateObj.getMonth() + 1
+        );
       }
     } else if (result.isDenied) {
       const success = await deleteWorkSchedule(wsId);

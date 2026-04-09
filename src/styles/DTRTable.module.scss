@@ -1,96 +1,252 @@
-.DTRTable {
-  background-color: #fafafa;
+.tableContainer {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  border: 1px solid #e0e6f2;
   border-radius: 12px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(30, 60, 120, 0.08);
+}
 
-  .table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.95rem;
+.summaryTable {
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  table-layout: fixed;
 
-    th,
-    td {
-      border: 1px solid #ccc;
-      padding: 0.75rem;
-      text-align: center;
-    }
+  thead {
+    background: #f2f5fc;
 
-    thead {
-      background-color: #f1f1f1;
-      font-weight: bold;
-    }
-
-    tbody tr:nth-child(even) {
-      background-color: #f9f9f9;
-    }
-
-    td:nth-child(8) {
-      font-size: 0.9rem;
-      color: #555;
-    }
-  }
-
-  .actions {
-    position: relative;
-    display: inline-block;
-  }
-
-  .actionButton {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 18px;
-  }
-
-  .dropdown {
-    position: absolute;
-    top: 100%;
-    right: 0;
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-    z-index: 10;
-    display: flex;
-    flex-direction: column;
-    min-width: 160px; // ensure consistent width
-
-    button {
-      display: flex;              // ✅ make row layout
-      align-items: center;        // ✅ vertical center
-      gap: 8px;                   // ✅ spacing between icon + text
-      background: none;
-      border: none;
-      padding: 8px 12px;
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      padding: 0.75rem 0.6rem;
       text-align: left;
-      cursor: pointer;
-      font-size: 0.9rem;
-
-      &:hover {
-        background-color: #f5f5f5;
-      }
-
-      svg,
-      img,
-      span {
-        flex-shrink: 0; // keep icons from shrinking
-      }
+      font-size: 0.82rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #4c5879;
+      border-bottom: 1px solid #dbe3f1;
+      white-space: normal;
     }
   }
 
-  .detailButton {
-    background-color: #20c997;
-    border: none;
-    color: white;
-    padding: 6px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.85rem;
-    transition: background-color 0.2s;
+  tbody {
+    tr {
+      border-bottom: 1px solid #edf1f8;
+    }
 
-    &:hover {
-      background-color: #198754;
+    tr:nth-child(4n + 1) {
+      background: #ffffff;
+    }
+
+    tr:nth-child(4n + 3) {
+      background: #fcfdff;
+    }
+
+    td {
+      padding: 0.62rem 0.6rem;
+      font-size: 0.92rem;
+      color: #2f3b57;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      vertical-align: middle;
+    }
+  }
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 84px;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.statusPresent {
+  color: #13653a;
+  background: #e7f7ef;
+  border-color: #b7e8cc;
+}
+
+.statusLate {
+  color: #915900;
+  background: #fff4df;
+  border-color: #f6d79b;
+}
+
+.statusAbsent {
+  color: #8d1f1f;
+  background: #fdecec;
+  border-color: #f4bcbc;
+}
+
+.statusDefault {
+  color: #435071;
+  background: #edf1fa;
+  border-color: #d4deef;
+}
+
+.segmentToggleButton {
+  background: linear-gradient(120deg, #4e61bb 0%, #2f87d4 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.03);
+    box-shadow: 0 6px 12px rgba(53, 93, 190, 0.28);
+  }
+
+  &:active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+}
+
+.segmentCell {
+  padding: 0;
+}
+
+.segmentPanel {
+  margin: 0.45rem 0.5rem 0.9rem;
+  background: #f8faff;
+  border: 1px solid #dde6f6;
+  border-radius: 10px;
+  padding: 0.65rem;
+}
+
+.segmentTable {
+  width: 100%;
+  border-collapse: collapse;
+
+  thead {
+    background: #e9effc;
+
+    th {
+      padding: 0.52rem 0.45rem;
+      font-size: 0.76rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #445170;
+      border-bottom: 1px solid #d2ddf3;
+      white-space: normal;
     }
   }
 
+  tbody {
+    tr {
+      border-bottom: 1px solid #e7edf9;
+    }
+
+    td {
+      padding: 0.45rem;
+      font-size: 0.86rem;
+      color: #334160;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+  }
+}
+
+.noSegments {
+  text-align: center;
+  color: #647197;
+  padding: 0.9rem;
+}
+
+@media (max-width: 700px) {
+  .tableContainer {
+    border-radius: 10px;
+    overflow-x: auto;
+  }
+
+  .summaryTable {
+    min-width: 680px;
+    table-layout: auto;
+  }
+}
+
+.workDateCell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.workDateHint {
+  font-size: 0.78rem;
+  color: #5d6990;
+}
+
+.headerWithHelp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.helpIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1px solid #9eabca;
+  color: #52608a;
+  background: #f6f8fd;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: help;
+}
+
+.timeOutCell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nextDayMarker {
+  color: #5a67ba;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.segmentTypeBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.18rem 0.5rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.segmentTypeOvernight {
+  color: #5c3f00;
+  background: #fff3d9;
+  border-color: #f2d294;
+}
+
+.segmentTypeSameDay {
+  color: #35506f;
+  background: #edf2fb;
+  border-color: #d3deef;
 }
