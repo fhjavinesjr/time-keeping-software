@@ -8,6 +8,49 @@
   box-shadow: 0 8px 20px rgba(30, 60, 120, 0.08);
 }
 
+.holidayLegendRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid #e6ecf8;
+  background: #f8fbff;
+}
+
+.legendTitle {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #4b5777;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: #4a5879;
+}
+
+.legendSwatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.legendRegular {
+  background: #b22222;
+}
+
+.legendSpecial {
+  background: #d97706;
+}
+
+.legendWorking {
+  background: #2f855a;
+}
+
 .summaryTable {
   width: 100%;
   min-width: 0;
@@ -86,6 +129,12 @@
   color: #8d1f1f;
   background: #fdecec;
   border-color: #f4bcbc;
+}
+
+.statusHoliday {
+  color: #7a2e00;
+  background: #fff1e0;
+  border-color: #f4cf9d;
 }
 
 .statusDefault {
@@ -249,4 +298,62 @@
   color: #35506f;
   background: #edf2fb;
   border-color: #d3deef;
+}
+
+.noSegmentText {
+  color: #66769f;
+  font-weight: 600;
+}
+
+.statusCell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.holidayDetailList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.holidayDetailItem {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.holidayTypeBadge {
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 0.14rem 0.45rem;
+  white-space: nowrap;
+}
+
+.holidayTypeRegular {
+  color: #8d1f1f;
+  background: #fdecec;
+  border-color: #f1b8b8;
+}
+
+.holidayTypeSpecial {
+  color: #8a5100;
+  background: #fff4df;
+  border-color: #f2d49d;
+}
+
+.holidayTypeWorking {
+  color: #1b6f44;
+  background: #e8f7ef;
+  border-color: #b9e6cd;
+}
+
+.holidayDetailText {
+  font-size: 0.78rem;
+  color: #526085;
 }

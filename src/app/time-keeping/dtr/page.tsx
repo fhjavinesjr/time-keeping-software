@@ -15,7 +15,8 @@ import { localStorageUtil } from "@/lib/utils/localStorageUtil";
 import { Employee } from "@/lib/types/Employee";
 const API_BASE_URL_TIMEKEEPING =
   process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
-import Swal from "sweetalert2";
+const API_BASE_URL_ADMINISTRATIVE =
+  process.env.NEXT_PUBLIC_API_BASE_URL_ADMINISTRATIVE;
 
 type DTRSegmentDTO = {
   dtrSegmentId: number;
@@ -41,6 +42,125 @@ type DTRDailyDTO = {
   totalOvertimeMinutes: number;
   attendanceStatus: string;
   segments: DTRSegmentDTO[];
+  holidayDetails?: HolidayDetail[];
+};
+
+type HolidayCategory = "regular" | "special" | "working";
+
+type HolidayDetail = {
+  name: string;
+  holidayType: string;
+  holidayScope: string;
+  category: HolidayCategory;
+};
+
+type HolidayDTO = {
+  holidayId?: number;
+  name: string;
+  holidayDate: string;
+  observedDate?: string | null;
+  holidayType: string;
+  holidayScope: string;
+  isWorkingHoliday: boolean;
+  isActive: boolean;
+};
+
+const toIsoDateKey = (customDate: string): string => {
+  const [month, day, year] = customDate.split(" ")[0].split("-");
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+};
+
+const toCustomDateStart = (isoDate: string): string => {
+  const [year, month, day] = isoDate.split("-");
+  return `${month}-${day}-${year} 00:00:00`;
+};
+
+const getDateKeysInRange = (fromCustom: string, toCustom: string): string[] => {
+  const from = new Date(toIsoDateKey(fromCustom));
+  const to = new Date(toIsoDateKey(toCustom));
+
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) {
+    return [];
+  }
+
+  const dateKeys: string[] = [];
+  const cursor = new Date(from);
+
+  while (cursor <= to) {
+    const isoDate = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(cursor.getDate()).padStart(2, "0")}`;
+    dateKeys.push(isoDate);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return dateKeys;
+};
+
+const resolveHolidayDate = (holiday: HolidayDTO): string => {
+  const observed = holiday.observedDate?.trim();
+  if (observed && observed !== holiday.holidayDate) {
+    return observed;
+  }
+
+  return holiday.holidayDate;
+};
+
+const getHolidayCategory = (holiday: HolidayDTO): HolidayCategory => {
+  if (holiday.isWorkingHoliday || holiday.holidayType === "SPECIAL_WORKING") {
+    return "working";
+  }
+
+  if (holiday.holidayType === "REGULAR") {
+    return "regular";
+  }
+
+  return "special";
+};
+
+const buildDTRWithMissingDates = (
+  sourceRecords: DTRDailyDTO[],
+  holidayMap: Map<string, HolidayDetail[]>,
+  fromCustom: string,
+  toCustom: string,
+  employeeId?: string
+): DTRDailyDTO[] => {
+  const dateKeys = getDateKeysInRange(fromCustom, toCustom);
+
+  if (dateKeys.length === 0) {
+    return sourceRecords;
+  }
+
+  const sourceMap = new Map<string, DTRDailyDTO>();
+  sourceRecords.forEach((record) => {
+    sourceMap.set(toIsoDateKey(record.workDate), record);
+  });
+
+  return dateKeys.map((dateKey, index) => {
+    const existing = sourceMap.get(dateKey);
+    const holidayDetails = holidayMap.get(dateKey) || [];
+
+    if (existing) {
+      return {
+        ...existing,
+        holidayDetails,
+      };
+    }
+
+    return {
+      dtrDailyId: -(index + 1),
+      employeeId: employeeId || "",
+      workDate: toCustomDateStart(dateKey),
+      totalWorkMinutes: 0,
+      totalLateMinutes: 0,
+      totalUndertimeMinutes: 0,
+      totalOvertimeMinutes: 0,
+      attendanceStatus: holidayDetails.length > 0 ? "HOLIDAY" : "ABSENT",
+      segments: [],
+      holidayDetails,
+    };
+  });
 };
 
 export default function DTRPage() {
@@ -50,6 +170,7 @@ export default function DTRPage() {
   const { fromDate, setFromDate, toDate, setToDate } = useCurrentMonthRange();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
+  const [holidays, setHolidays] = useState<HolidayDTO[]>([]);
 
   useEffect(() => {
     const storedEmployees = localStorageUtil.getEmployees();
@@ -59,6 +180,8 @@ export default function DTRPage() {
       // fallback fetch if not in localStorage
       fetchEmployees();
     }
+
+    fetchHolidays();
   }, []);
 
   useEffect(() => {
@@ -115,20 +238,34 @@ export default function DTRPage() {
           throw new Error(`Failed to fetch DTR daily records: ${res.status}`);
         }
 
-        const dtrJson = await res.json();
+        const dtrJson: DTRDailyDTO[] = await res.json();
 
-        if (dtrJson.length > 0) {
-          setRecords(dtrJson);
-        } else {
-          Swal.fire({
-            title: "No Daily Time Record Found",
-            text: "There are no records available for the selected date.",
-            icon: "warning",
-            confirmButtonText: "OK",
-            confirmButtonColor: "#d33",
+        const holidayMap = new Map<string, HolidayDetail[]>();
+        holidays
+          .filter((holiday) => holiday.isActive)
+          .forEach((holiday) => {
+            const dateKey = toIsoDateKey(resolveHolidayDate(holiday));
+            const current = holidayMap.get(dateKey) || [];
+            holidayMap.set(dateKey, [
+              ...current,
+              {
+                name: holiday.name,
+                holidayType: holiday.holidayType,
+                holidayScope: holiday.holidayScope,
+                category: getHolidayCategory(holiday),
+              },
+            ]);
           });
-          setRecords([]);
-        }
+
+        const recordsWithFilledDates = buildDTRWithMissingDates(
+          dtrJson,
+          holidayMap,
+          fromDate,
+          toDate,
+          selectedEmployee.employeeId
+        );
+
+        setRecords(recordsWithFilledDates);
         console.log("Successfully fetch DTR employees", res.status);
       } else {
         console.error("Error fetching DTR employees");
@@ -136,6 +273,24 @@ export default function DTRPage() {
       }
     } catch (error) {
       console.error("Error fetching DTR employees:", error);
+    }
+  };
+
+  const fetchHolidays = async () => {
+    try {
+      const res = await fetchWithAuth(
+        `${API_BASE_URL_ADMINISTRATIVE}/api/holiday/get-all`
+      );
+
+      if (!res.ok) {
+        console.error("Failed to fetch holidays:", res.status);
+        return;
+      }
+
+      const holidayJson: HolidayDTO[] = await res.json();
+      setHolidays(holidayJson || []);
+    } catch (error) {
+      console.error("Error fetching holidays:", error);
     }
   };
 

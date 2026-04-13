@@ -36,6 +36,44 @@
       gap: 0.75rem;
     }
 
+    .holidayLegendRow {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 1rem;
+      margin-top: 1rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid #ddd;
+    }
+
+    .holidayLegendItem {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.92rem;
+      color: #444;
+      font-weight: 600;
+    }
+
+    .holidayLegendSwatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    .holidayRegular {
+      background-color: #b22222;
+    }
+
+    .holidaySpecial {
+      background-color: #d97706;
+    }
+
+    .holidayWorking {
+      background-color: #2f855a;
+    }
+
     .legendItem {
       display: flex;
       justify-content: center; /* horizontal center */
@@ -100,6 +138,40 @@
       background-color: #006fa3 !important; /* darker blue */
       transform: scale(1.02); /* subtle zoom */
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); /* small shadow */
+    }
+
+    :global(.fc-daygrid-event.holiday-event) {
+      color: #fff !important;
+      cursor: default !important;
+    }
+
+    :global(.fc-daygrid-event.holiday-event.holiday-regular) {
+      background-color: #b22222 !important;
+    }
+
+    :global(.fc-daygrid-event.holiday-event.holiday-special) {
+      background-color: #d97706 !important;
+    }
+
+    :global(.fc-daygrid-event.holiday-event.holiday-working) {
+      background-color: #2f855a !important;
+    }
+
+    :global(.fc-daygrid-event.holiday-event:hover) {
+      transform: none !important;
+      box-shadow: none !important;
+    }
+
+    :global(.fc-daygrid-event.holiday-event.holiday-regular:hover) {
+      background-color: #8b1a1a !important;
+    }
+
+    :global(.fc-daygrid-event.holiday-event.holiday-special:hover) {
+      background-color: #b45309 !important;
+    }
+
+    :global(.fc-daygrid-event.holiday-event.holiday-working:hover) {
+      background-color: #276749 !important;
     }
 
   }

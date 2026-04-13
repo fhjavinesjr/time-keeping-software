@@ -29,6 +29,36 @@ type ShiftEvent = {
   wsId: number;
   title: string;
   date: string;
+  classNames?: string[];
+  extendedProps?: {
+    eventType: "workSchedule";
+  };
+};
+
+type HolidayDTO = {
+  holidayId?: number;
+  name: string;
+  holidayDate: string;
+  observedDate?: string | null;
+  holidayType: string;
+  withPay: boolean;
+  isWorkingHoliday: boolean;
+  isActive: boolean;
+};
+
+type HolidayEvent = {
+  id: string;
+  title: string;
+  date: string;
+  classNames: string[];
+  extendedProps: {
+    eventType: "holiday";
+    holidayCategory: "regular" | "special" | "working";
+    holidayType: string;
+    withPay: boolean;
+    isWorkingHoliday: boolean;
+    sourceDate: "holidayDate" | "observedDate";
+  };
 };
 
 type TimeShift = {
@@ -41,7 +71,8 @@ type TimeShift = {
 };
 
 export default function WorkSchedule() {
-  const [events, setEvents] = useState<ShiftEvent[]>([]);
+  const [workScheduleEvents, setWorkScheduleEvents] = useState<ShiftEvent[]>([]);
+  const [holidayEvents, setHolidayEvents] = useState<HolidayEvent[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
     null
@@ -68,6 +99,7 @@ export default function WorkSchedule() {
     }
 
     fetchTimeShifts();
+  fetchHolidays();
 
     const today = new Date();
     fetchAllWorkSchedule(employeeId, today.getFullYear(), today.getMonth() + 1);
@@ -82,7 +114,7 @@ export default function WorkSchedule() {
         today.getMonth() + 1
       );
     } else {
-      setEvents([]); // clear calendar if no employee
+      setWorkScheduleEvents([]); // clear schedule-only events if no employee
     }
   }, [selectedEmployee]);
 
@@ -106,6 +138,68 @@ export default function WorkSchedule() {
     }
   };
 
+  const getHolidayDisplayDate = (holiday: HolidayDTO) => {
+    const observed = holiday.observedDate?.trim();
+    if (observed && observed !== holiday.holidayDate) {
+      return { value: observed, source: "observedDate" as const };
+    }
+
+    return { value: holiday.holidayDate, source: "holidayDate" as const };
+  };
+
+  const getHolidayCategory = (holiday: HolidayDTO) => {
+    if (holiday.isWorkingHoliday || holiday.holidayType === "SPECIAL_WORKING") {
+      return "working" as const;
+    }
+
+    if (holiday.holidayType === "REGULAR") {
+      return "regular" as const;
+    }
+
+    return "special" as const;
+  };
+
+  const fetchHolidays = async () => {
+    try {
+      const res = await fetchWithAuth(
+        `${API_BASE_URL_ADMINISTRATIVE}/api/holiday/get-all`
+      );
+
+      if (!res.ok) {
+        console.error("Failed to fetch holidays:", res.status);
+        return;
+      }
+
+      const data: HolidayDTO[] = await res.json();
+      const activeHolidays = (data || []).filter((holiday) => holiday.isActive);
+
+      const mappedHolidayEvents: HolidayEvent[] = activeHolidays.map((holiday) => {
+        const effectiveDate = getHolidayDisplayDate(holiday);
+        const holidayCategory = getHolidayCategory(holiday);
+
+        return {
+          id: `holiday-${holiday.holidayId ?? holiday.name}-${effectiveDate.value}`,
+          title: holiday.name,
+          date: toDateInputValue(effectiveDate.value),
+          classNames: ["holiday-event", `holiday-${holidayCategory}`],
+          extendedProps: {
+            eventType: "holiday",
+            holidayCategory,
+            holidayType: holiday.holidayType,
+            withPay: holiday.withPay,
+            isWorkingHoliday: holiday.isWorkingHoliday,
+            sourceDate: effectiveDate.source,
+          },
+        };
+      });
+
+      setHolidayEvents(mappedHolidayEvents);
+      console.log("Successfully fetched holidays", mappedHolidayEvents);
+    } catch (error) {
+      console.error("Error fetching holidays:", error);
+    }
+  };
+
   // Fetch All Work Schedule by Selected employee (page load)
   const fetchAllWorkSchedule = async (
     employeeId: string | null,
@@ -123,7 +217,7 @@ export default function WorkSchedule() {
 
       if (res.status === 204) {
         console.log("No work schedule found for this employee/month");
-        setEvents([]); // clear calendar
+        setWorkScheduleEvents([]); // clear schedule-only events
         return;
       }
 
@@ -138,9 +232,13 @@ export default function WorkSchedule() {
         wsId: ws.wsId,
         title: ws.tsCode,
         date: toDateInputValue(ws.wsDateTime),
+        classNames: ["work-schedule-event"],
+        extendedProps: {
+          eventType: "workSchedule",
+        },
       }));
 
-      setEvents(mappedEvents);
+      setWorkScheduleEvents(mappedEvents);
       console.log("Successfully fetched work schedule", mappedEvents);
     } catch (error) {
       console.error("Error fetching work schedule:", error);
@@ -266,7 +364,7 @@ export default function WorkSchedule() {
 
   // Utility: Get all events for a date
   const getEventsForDate = (dateStr: string, excludedWsId?: number) =>
-    events.filter(
+    workScheduleEvents.filter(
       (event) => event.date === dateStr && event.wsId !== excludedWsId
     );
 
@@ -365,9 +463,15 @@ export default function WorkSchedule() {
         arg.dateStr
       );
       if (success) {
-        setEvents((prev) => [
+        setWorkScheduleEvents((prev) => [
           ...prev,
-          { wsId: success.metaId, title: shift.tsCode, date: arg.dateStr },
+          {
+            wsId: success.metaId,
+            title: shift.tsCode,
+            date: arg.dateStr,
+            classNames: ["work-schedule-event"],
+            extendedProps: { eventType: "workSchedule" },
+          },
         ]);
       }
     }
@@ -375,6 +479,34 @@ export default function WorkSchedule() {
 
   //Update/Delete Work Schedule
   const handleEventClick = async (clickInfo: EventClickArg) => {
+    const eventType = (clickInfo.event.extendedProps?.eventType || "") as
+      | "holiday"
+      | "workSchedule"
+      | "";
+
+    if (eventType === "holiday") {
+      const sourceDate = clickInfo.event.extendedProps?.sourceDate;
+      const holidayType = (clickInfo.event.extendedProps?.holidayType || "") as string;
+      const withPay = clickInfo.event.extendedProps?.withPay ? "Yes" : "No";
+      const workingHoliday = clickInfo.event.extendedProps?.isWorkingHoliday ? "Yes" : "No";
+
+      Swal.fire({
+        title: clickInfo.event.title,
+        html: `
+          <div style="text-align:left;line-height:1.6;">
+            <div><strong>Type:</strong> ${holidayType.replaceAll("_", " ")}</div>
+            <div><strong>Applied Date:</strong> ${clickInfo.event.startStr}</div>
+            <div><strong>Source:</strong> ${sourceDate === "observedDate" ? "Observed Date" : "Holiday Date"}</div>
+            <div><strong>With Pay:</strong> ${withPay}</div>
+            <div><strong>Working Holiday:</strong> ${workingHoliday}</div>
+          </div>
+        `,
+        icon: "info",
+        confirmButtonText: "OK",
+      });
+      return;
+    }
+
     if (!selectedEmployee) {
       Swal.fire("Warning", "Please select an employee first.", "warning");
       return;
@@ -448,7 +580,9 @@ export default function WorkSchedule() {
     } else if (result.isDenied) {
       const success = await deleteWorkSchedule(wsId);
       if (success) {
-        setEvents((prev) => prev.filter((event) => event.wsId !== wsId));
+        setWorkScheduleEvents((prev) =>
+          prev.filter((event) => event.wsId !== wsId)
+        );
         Swal.fire({
           title: "Deleted!",
           text: "Shift removed from schedule.",
@@ -560,6 +694,29 @@ export default function WorkSchedule() {
                   </div>
                 ))}
               </div>
+              <div className={styles.holidayLegendRow}>
+                <div className={styles.holidayLegendItem}>
+                  <span
+                    className={`${styles.holidayLegendSwatch} ${styles.holidayRegular}`}
+                    aria-hidden="true"
+                  />
+                  <span>Regular Holiday</span>
+                </div>
+                <div className={styles.holidayLegendItem}>
+                  <span
+                    className={`${styles.holidayLegendSwatch} ${styles.holidaySpecial}`}
+                    aria-hidden="true"
+                  />
+                  <span>Special Holiday</span>
+                </div>
+                <div className={styles.holidayLegendItem}>
+                  <span
+                    className={`${styles.holidayLegendSwatch} ${styles.holidayWorking}`}
+                    aria-hidden="true"
+                  />
+                  <span>Working Holiday</span>
+                </div>
+              </div>
             </div>
             <FullCalendar
               plugins={[dayGridPlugin, interactionPlugin]}
@@ -569,13 +726,29 @@ export default function WorkSchedule() {
                 center: "title",
                 right: "",
               }}
-              events={events}
+              events={[...workScheduleEvents, ...holidayEvents]}
               dateClick={userRole === "1" ? handleDateClick : undefined}
               eventClick={userRole === "1" ? handleEventClick : undefined} // ✅ Add this line
               editable={false}
               selectable={true}
               height="auto"
               eventContent={(arg) => {
+                const eventType = arg.event.extendedProps?.eventType as
+                  | "holiday"
+                  | "workSchedule"
+                  | undefined;
+
+                if (eventType === "holiday") {
+                  return (
+                    <div>
+                      <strong>Holiday</strong>
+                      <div style={{ fontSize: "0.78em", lineHeight: "1.2" }}>
+                        {arg.event.title}
+                      </div>
+                    </div>
+                  );
+                }
+
                 const shift = timeShift.find(
                   (s) => s.tsCode === arg.event.title
                 );

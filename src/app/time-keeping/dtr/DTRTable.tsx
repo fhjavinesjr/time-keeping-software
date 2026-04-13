@@ -32,6 +32,14 @@ type DTRDailyDTO = {
   totalOvertimeMinutes: number;
   attendanceStatus: string;
   segments: DTRSegmentDTO[];
+  holidayDetails?: HolidayDetail[];
+};
+
+type HolidayDetail = {
+  name: string;
+  holidayType: string;
+  holidayScope: string;
+  category: "regular" | "special" | "working";
 };
 
 type Props = {
@@ -50,12 +58,15 @@ const formatTime = (timeStr: string) => {
 const getStatusClass = (status: string) => {
   const normalized = status.toLowerCase();
 
+  if (normalized.includes("holiday")) return styles.statusHoliday;
   if (normalized.includes("present")) return styles.statusPresent;
   if (normalized.includes("late")) return styles.statusLate;
   if (normalized.includes("absent")) return styles.statusAbsent;
 
   return styles.statusDefault;
 };
+
+const formatHolidayType = (value: string) => value.replaceAll("_", " ");
 
 export default function DTRTable({ records }: Props) {
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -66,6 +77,21 @@ export default function DTRTable({ records }: Props) {
 
   return (
     <div className={styles.tableContainer}>
+      <div className={styles.holidayLegendRow}>
+        <span className={styles.legendTitle}>Holiday Legend:</span>
+        <span className={styles.legendItem}>
+          <span className={`${styles.legendSwatch} ${styles.legendRegular}`} />
+          Regular
+        </span>
+        <span className={styles.legendItem}>
+          <span className={`${styles.legendSwatch} ${styles.legendSpecial}`} />
+          Special
+        </span>
+        <span className={styles.legendItem}>
+          <span className={`${styles.legendSwatch} ${styles.legendWorking}`} />
+          Working
+        </span>
+      </div>
       <table className={styles.summaryTable}>
         <thead>
           <tr>
@@ -95,26 +121,54 @@ export default function DTRTable({ records }: Props) {
                     </div>
                   </td>
                   <td>
-                    <span
-                      className={`${styles.statusBadge} ${getStatusClass(
-                        rec.attendanceStatus
-                      )}`}
-                    >
-                      {rec.attendanceStatus}
-                    </span>
+                    <div className={styles.statusCell}>
+                      <span
+                        className={`${styles.statusBadge} ${getStatusClass(
+                          rec.attendanceStatus
+                        )}`}
+                      >
+                        {rec.attendanceStatus}
+                      </span>
+                      {rec.holidayDetails && rec.holidayDetails.length > 0 && (
+                        <div className={styles.holidayDetailList}>
+                          {rec.holidayDetails.map((holiday, index) => (
+                            <div key={`${holiday.name}-${index}`} className={styles.holidayDetailItem}>
+                              <span
+                                className={`${styles.holidayTypeBadge} ${
+                                  holiday.category === "regular"
+                                    ? styles.holidayTypeRegular
+                                    : holiday.category === "working"
+                                    ? styles.holidayTypeWorking
+                                    : styles.holidayTypeSpecial
+                                }`}
+                              >
+                                {formatHolidayType(holiday.holidayType)}
+                              </span>
+                              <span className={styles.holidayDetailText}>
+                                {holiday.name} ({holiday.holidayScope})
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td>{rec.totalWorkMinutes}</td>
                   <td>{rec.totalLateMinutes}</td>
                   <td>{rec.totalUndertimeMinutes}</td>
                   <td>{rec.totalOvertimeMinutes}</td>
                   <td>
-                    <button
-                      className={styles.segmentToggleButton}
-                      aria-label={expanded === idx ? "Hide segments" : "Show segments"}
-                      onClick={() => handleExpand(idx)}
-                    >
-                      {expanded === idx ? "Hide" : "Show"}
-                    </button>
+                    {rec.segments && rec.segments.length > 0 ? (
+                      <button
+                        className={styles.segmentToggleButton}
+                        aria-label={expanded === idx ? "Hide segments" : "Show segments"}
+                        onClick={() => handleExpand(idx)}
+                      >
+                        {expanded === idx ? "Hide" : "Show"}
+                      </button>
+                    ) : (
+                      <span className={styles.noSegmentText}>-</span>
+                    )}
                   </td>
                 </tr>
                 {expanded === idx && (
