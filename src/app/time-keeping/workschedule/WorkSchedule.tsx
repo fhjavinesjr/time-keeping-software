@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin, { DateClickArg } from "@fullcalendar/interaction";
@@ -31,7 +31,8 @@ type ShiftEvent = {
   date: string;
   classNames?: string[];
   extendedProps?: {
-    eventType: "workSchedule";
+    eventType: "workSchedule" | "dayOff";
+    isDayOff?: boolean;
   };
 };
 
@@ -70,6 +71,27 @@ type TimeShift = {
   tsName?: string; // Optional, for tooltip
 };
 
+const getHolidayDisplayDate = (holiday: HolidayDTO) => {
+  const observed = holiday.observedDate?.trim();
+  if (observed && observed !== holiday.holidayDate) {
+    return { value: observed, source: "observedDate" as const };
+  }
+
+  return { value: holiday.holidayDate, source: "holidayDate" as const };
+};
+
+const getHolidayCategory = (holiday: HolidayDTO) => {
+  if (holiday.isWorkingHoliday || holiday.holidayType === "SPECIAL_WORKING") {
+    return "working" as const;
+  }
+
+  if (holiday.holidayType === "REGULAR") {
+    return "regular" as const;
+  }
+
+  return "special" as const;
+};
+
 export default function WorkSchedule() {
   const [workScheduleEvents, setWorkScheduleEvents] = useState<ShiftEvent[]>([]);
   const [holidayEvents, setHolidayEvents] = useState<HolidayEvent[]>([]);
@@ -80,46 +102,10 @@ export default function WorkSchedule() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [employeeInputValue, setEmployeeInputValue] = useState<string>("");
   const [timeShift, setTimeShift] = useState<TimeShift[]>([]);
-
-  // On mount: load role and employee list
-  useEffect(() => {
-    const role = localStorageUtil.getEmployeeRole();
-    const employeeNo = localStorageUtil.getEmployeeNo();
-    const employeeId = localStorageUtil.getEmployeeId();
-
-    setUserRole(role);
-
-    const storedEmployees = localStorageUtil.getEmployees();
-    setEmployees(storedEmployees);
-
-    const emp = storedEmployees.find((e) => e.employeeNo === employeeNo);
-    if (emp) {
-      setSelectedEmployee(emp);
-      setEmployeeInputValue(`[${emp.employeeNo}] ${emp.fullName}`);
-    }
-
-    fetchTimeShifts();
-  fetchHolidays();
-
-    const today = new Date();
-    fetchAllWorkSchedule(employeeId, today.getFullYear(), today.getMonth() + 1);
-  }, []);
-
-  useEffect(() => {
-    if (selectedEmployee) {
-      const today = new Date();
-      fetchAllWorkSchedule(
-        selectedEmployee.employeeId,
-        today.getFullYear(),
-        today.getMonth() + 1
-      );
-    } else {
-      setWorkScheduleEvents([]); // clear schedule-only events if no employee
-    }
-  }, [selectedEmployee]);
+  const [currentCalendarDate, setCurrentCalendarDate] = useState<Date>(new Date());
 
   // Fetch Time Shifts (page load)
-  const fetchTimeShifts = async () => {
+  const fetchTimeShifts = useCallback(async () => {
     try {
       const res = await fetchWithAuth(
         `${API_BASE_URL_ADMINISTRATIVE}/api/getAll/time-shift`
@@ -136,30 +122,9 @@ export default function WorkSchedule() {
     } catch (error) {
       console.error("Error fetching time-shift:", error);
     }
-  };
+  }, []);
 
-  const getHolidayDisplayDate = (holiday: HolidayDTO) => {
-    const observed = holiday.observedDate?.trim();
-    if (observed && observed !== holiday.holidayDate) {
-      return { value: observed, source: "observedDate" as const };
-    }
-
-    return { value: holiday.holidayDate, source: "holidayDate" as const };
-  };
-
-  const getHolidayCategory = (holiday: HolidayDTO) => {
-    if (holiday.isWorkingHoliday || holiday.holidayType === "SPECIAL_WORKING") {
-      return "working" as const;
-    }
-
-    if (holiday.holidayType === "REGULAR") {
-      return "regular" as const;
-    }
-
-    return "special" as const;
-  };
-
-  const fetchHolidays = async () => {
+  const fetchHolidays = useCallback(async () => {
     try {
       const res = await fetchWithAuth(
         `${API_BASE_URL_ADMINISTRATIVE}/api/holiday/get-all`
@@ -198,10 +163,10 @@ export default function WorkSchedule() {
     } catch (error) {
       console.error("Error fetching holidays:", error);
     }
-  };
+  }, []);
 
   // Fetch All Work Schedule by Selected employee (page load)
-  const fetchAllWorkSchedule = async (
+  const fetchAllWorkSchedule = useCallback(async (
     employeeId: string | null,
     year: number,
     month: number
@@ -230,11 +195,12 @@ export default function WorkSchedule() {
       // map backend DTOs to FullCalendar events
       const mappedEvents: ShiftEvent[] = data.map((ws: WorkScheduleDTO) => ({
         wsId: ws.wsId,
-        title: ws.tsCode,
+        title: ws.isDayOff ? "Day Off" : (ws.tsCode ?? ""),
         date: toDateInputValue(ws.wsDateTime),
-        classNames: ["work-schedule-event"],
+        classNames: ws.isDayOff ? ["day-off-event"] : ["work-schedule-event"],
         extendedProps: {
-          eventType: "workSchedule",
+          eventType: ws.isDayOff ? ("dayOff" as const) : ("workSchedule" as const),
+          isDayOff: ws.isDayOff ?? false,
         },
       }));
 
@@ -243,7 +209,44 @@ export default function WorkSchedule() {
     } catch (error) {
       console.error("Error fetching work schedule:", error);
     }
-  };
+  }, []);
+
+  // On mount: load role and employee list
+  useEffect(() => {
+    const role = localStorageUtil.getEmployeeRole();
+    const employeeNo = localStorageUtil.getEmployeeNo();
+    const employeeId = localStorageUtil.getEmployeeId();
+
+    setUserRole(role);
+
+    const storedEmployees = localStorageUtil.getEmployees();
+    setEmployees(storedEmployees);
+
+    const emp = storedEmployees.find((e) => e.employeeNo === employeeNo);
+    if (emp) {
+      setSelectedEmployee(emp);
+      setEmployeeInputValue(`[${emp.employeeNo}] ${emp.fullName}`);
+    }
+
+    fetchTimeShifts();
+    fetchHolidays();
+
+    const today = new Date();
+    fetchAllWorkSchedule(employeeId, today.getFullYear(), today.getMonth() + 1);
+  }, [fetchAllWorkSchedule, fetchHolidays, fetchTimeShifts]);
+
+  useEffect(() => {
+    if (selectedEmployee) {
+      const today = new Date();
+      fetchAllWorkSchedule(
+        selectedEmployee.employeeId,
+        today.getFullYear(),
+        today.getMonth() + 1
+      );
+    } else {
+      setWorkScheduleEvents([]); // clear schedule-only events if no employee
+    }
+  }, [fetchAllWorkSchedule, selectedEmployee]);
 
   const saveOrUpdateWorkSchedule = async (
     employeeId: string,
@@ -287,11 +290,12 @@ export default function WorkSchedule() {
       return metadata;
     } catch (err) {
       console.error("Error saving work schedule:", err);
-      Swal.fire(
-        "Error",
-        "Failed to save work schedule. Please try again.",
-        "error"
-      );
+      Swal.fire({
+        title: "Error",
+        text: "Failed to save work schedule. Please try again.",
+        icon: "error",
+        returnFocus: false,
+      });
       return false;
     }
   };
@@ -337,11 +341,12 @@ export default function WorkSchedule() {
       return true;
     } catch (err) {
       console.error("Error saving work schedule:", err);
-      Swal.fire(
-        "Error",
-        "Failed to save work schedule. Please try again.",
-        "error"
-      );
+      Swal.fire({
+        title: "Error",
+        text: "Failed to save work schedule. Please try again.",
+        icon: "error",
+        returnFocus: false,
+      });
       return false;
     }
   };
@@ -411,11 +416,84 @@ export default function WorkSchedule() {
   // Assign/Create Work Schedule (multiple shifts per day, no overlap, max 24h)
   const handleDateClick = async (arg: DateClickArg) => {
     if (!selectedEmployee) {
-      Swal.fire("Warning", "Please select an employee first.", "warning");
+      Swal.fire({
+        title: "Warning",
+        text: "Please select an employee first.",
+        icon: "warning",
+        returnFocus: false,
+      });
       return;
     }
 
     const dayEvents = getEventsForDate(arg.dateStr);
+
+    const choice = await Swal.fire({
+      title: `Assign for ${arg.dateStr}`,
+      text: "What would you like to assign for this date?",
+      showCancelButton: true,
+      confirmButtonText: "Assign Shift",
+      denyButtonText: "Mark as Day Off",
+      showDenyButton: true,
+      returnFocus: false,
+    });
+
+    if (choice.isDismissed) return;
+
+    if (choice.isDenied) {
+      // --- Day Off path ---
+      if (dayEvents.length > 0) {
+        await Swal.fire({
+          title: "Warning",
+          text: "This date already has entries. Remove them first before marking as Day Off.",
+          icon: "warning",
+          returnFocus: false,
+        });
+        return;
+      }
+      const wsDateTime = format(parseISO(`${arg.dateStr}T00:00:00`), "MM-dd-yyyy HH:mm:ss");
+      try {
+        const res = await fetchWithAuth(`${API_BASE_URL_TIMEKEEPING}/api/create/work-schedule`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ employeeId: selectedEmployee.employeeId, wsDateTime, isDayOff: true }),
+        });
+        if (!res.ok) throw new Error(`Failed: ${res.status}`);
+        const metadata = await res.json();
+        setWorkScheduleEvents((prev) => [
+          ...prev,
+          {
+            wsId: metadata.metaId,
+            title: "Day Off",
+            date: arg.dateStr,
+            classNames: ["day-off-event"],
+            extendedProps: { eventType: "dayOff" as const, isDayOff: true },
+          },
+        ]);
+        Swal.fire({ title: "Done!", text: "Rest day saved.", icon: "success", returnFocus: false });
+      } catch (err) {
+        console.error("Error saving day off:", err);
+        Swal.fire({
+          title: "Error",
+          text: "Failed to save rest day. Please try again.",
+          icon: "error",
+          returnFocus: false,
+        });
+      }
+      return;
+    }
+
+    // --- Shift assignment path (isConfirmed) ---
+    const hasDayOffEvent = dayEvents.some((e) => e.extendedProps?.eventType === "dayOff");
+    if (hasDayOffEvent) {
+      await Swal.fire({
+        title: "Warning",
+        text: "This date is marked as a Rest Day. Remove the Day Off entry first.",
+        icon: "warning",
+        returnFocus: false,
+      });
+      return;
+    }
+
     // Only include valid shift objects
     const dayShifts = dayEvents
       .map(e => getShiftByCode(e.title))
@@ -470,7 +548,7 @@ export default function WorkSchedule() {
             title: shift.tsCode,
             date: arg.dateStr,
             classNames: ["work-schedule-event"],
-            extendedProps: { eventType: "workSchedule" },
+            extendedProps: { eventType: "workSchedule" as const },
           },
         ]);
       }
@@ -482,7 +560,32 @@ export default function WorkSchedule() {
     const eventType = (clickInfo.event.extendedProps?.eventType || "") as
       | "holiday"
       | "workSchedule"
+      | "dayOff"
       | "";
+
+    if (eventType === "dayOff") {
+      if (!selectedEmployee) return;
+      const wsId = (clickInfo.event.extendedProps as ShiftEvent).wsId;
+      const wsDateTime = clickInfo.event.startStr;
+      const result = await Swal.fire({
+        title: `Rest Day — ${wsDateTime}`,
+        html: `<p><strong>${selectedEmployee.fullName}</strong></p><p style="color:#555;margin-top:0.4rem">This date is marked as a Rest Day.</p>`,
+        icon: "info",
+        showDenyButton: true,
+        showCancelButton: false,
+        confirmButtonText: "Close",
+        denyButtonText: "Remove Day Off",
+        returnFocus: false,
+      });
+      if (result.isDenied) {
+        const success = await deleteWorkSchedule(wsId);
+        if (success) {
+          setWorkScheduleEvents((prev) => prev.filter((e) => e.wsId !== wsId));
+          Swal.fire({ title: "Removed!", text: "Rest day removed from schedule.", icon: "success", returnFocus: false });
+        }
+      }
+      return;
+    }
 
     if (eventType === "holiday") {
       const sourceDate = clickInfo.event.extendedProps?.sourceDate;
@@ -503,12 +606,18 @@ export default function WorkSchedule() {
         `,
         icon: "info",
         confirmButtonText: "OK",
+        returnFocus: false,
       });
       return;
     }
 
     if (!selectedEmployee) {
-      Swal.fire("Warning", "Please select an employee first.", "warning");
+      Swal.fire({
+        title: "Warning",
+        text: "Please select an employee first.",
+        icon: "warning",
+        returnFocus: false,
+      });
       return;
     }
 
@@ -590,6 +699,144 @@ export default function WorkSchedule() {
           returnFocus: false, // ✅ prevents scroll jump
         });
       }
+    }
+  };
+
+  const handleAutoFillDayOff = async () => {
+    if (!selectedEmployee) {
+      Swal.fire({
+        title: "Warning",
+        text: "Please select an employee first.",
+        icon: "warning",
+        returnFocus: false,
+      });
+      return;
+    }
+
+    const defaultMonth = `${currentCalendarDate.getFullYear()}-${String(currentCalendarDate.getMonth() + 1).padStart(2, "0")}`;
+
+    const { value: formValues, isConfirmed } = await Swal.fire({
+      title: "Auto-fill Rest Days",
+      html: `
+        <p style="margin-bottom:0.75rem">Employee: <strong>${selectedEmployee.fullName}</strong></p>
+        <p style="font-size:0.88rem;color:#555;margin-bottom:0.5rem">Select which weekdays are rest days:</p>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.4rem 1rem;margin:0.5rem 0 1rem;text-align:left">
+          <label><input type="checkbox" id="af-sun" /> Sun</label>
+          <label><input type="checkbox" id="af-mon" /> Mon</label>
+          <label><input type="checkbox" id="af-tue" /> Tue</label>
+          <label><input type="checkbox" id="af-wed" /> Wed</label>
+          <label><input type="checkbox" id="af-thu" /> Thu</label>
+          <label><input type="checkbox" id="af-fri" /> Fri</label>
+          <label><input type="checkbox" id="af-sat" checked /> Sat</label>
+        </div>
+        <div>
+          <label style="font-size:0.9rem">Month:&nbsp;<input type="month" id="af-month" value="${defaultMonth}" style="padding:0.25rem 0.5rem;border:1px solid #ccc;border-radius:4px" /></label>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: "Preview & Apply",
+      preConfirm: () => {
+        const dayNames = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+        const days: number[] = dayNames
+          .map((d, i) => ({ d, i }))
+          .filter(({ d }) => (document.getElementById(`af-${d}`) as HTMLInputElement)?.checked)
+          .map(({ i }) => i);
+        const monthInput = document.getElementById("af-month") as HTMLInputElement;
+        if (!monthInput?.value) {
+          Swal.showValidationMessage("Please select a month.");
+          return false;
+        }
+        if (days.length === 0) {
+          Swal.showValidationMessage("Please select at least one rest day.");
+          return false;
+        }
+        return { days, month: monthInput.value };
+      },
+      allowOutsideClick: false,
+      returnFocus: false,
+    });
+
+    if (!isConfirmed || !formValues) return;
+
+    const { days, month } = formValues as { days: number[]; month: string };
+    const [yearStr, monthStr] = month.split("-");
+    const year = parseInt(yearStr, 10);
+    const monthNum = parseInt(monthStr, 10);
+
+    // Generate all dates in the month that fall on selected weekdays
+    const daysInMonth = new Date(year, monthNum, 0).getDate();
+    const generatedDates: string[] = [];
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, monthNum - 1, day);
+      if (days.includes(date.getDay())) {
+        const mm = String(monthNum).padStart(2, "0");
+        const dd = String(day).padStart(2, "0");
+        generatedDates.push(`${mm}-${dd}-${year} 00:00:00`);
+      }
+    }
+
+    // Filter out dates that already have any WorkSchedule entry
+    const existingDates = new Set(workScheduleEvents.map((e) => e.date));
+    const filteredDates = generatedDates.filter(
+      (d) => !existingDates.has(toDateInputValue(d))
+    );
+
+    if (filteredDates.length === 0) {
+      Swal.fire({
+        title: "Info",
+        text: "All matching dates already have entries. Nothing to add.",
+        icon: "info",
+        returnFocus: false,
+      });
+      return;
+    }
+
+    const confirm = await Swal.fire({
+      title: "Confirm Auto-fill",
+      text: `Add ${filteredDates.length} rest day(s) for ${selectedEmployee.fullName} in ${month}?`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Yes, apply",
+      returnFocus: false,
+    });
+    if (!confirm.isConfirmed) return;
+
+    const payload = filteredDates.map((d) => ({
+      employeeId: selectedEmployee.employeeId,
+      wsDateTime: d,
+      isDayOff: true,
+    }));
+
+    try {
+      const res = await fetchWithAuth(
+        `${API_BASE_URL_TIMEKEEPING}/api/bulk/day-off/work-schedule`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+      const autoFillResult = await res.json();
+      await Swal.fire({
+        title: "Done!",
+        text: `${autoFillResult.metaId} rest day(s) added to the schedule.`,
+        icon: "success",
+        returnFocus: false,
+      });
+      fetchAllWorkSchedule(
+        selectedEmployee.employeeId,
+        currentCalendarDate.getFullYear(),
+        currentCalendarDate.getMonth() + 1
+      );
+    } catch (err) {
+      console.error("Error auto-filling rest days:", err);
+      Swal.fire({
+        title: "Error",
+        text: "Failed to save rest days. Please try again.",
+        icon: "error",
+        returnFocus: false,
+      });
     }
   };
 
@@ -716,8 +963,26 @@ export default function WorkSchedule() {
                   />
                   <span>Working Holiday</span>
                 </div>
+                <div className={styles.holidayLegendItem}>
+                  <span
+                    className={`${styles.holidayLegendSwatch} ${styles.dayOffSwatch}`}
+                    aria-hidden="true"
+                  />
+                  <span>Day Off / Rest Day</span>
+                </div>
               </div>
             </div>
+            {userRole === "1" && (
+              <div className={styles.autoFillContainer}>
+                <button
+                  className={styles.autoFillButton}
+                  onClick={handleAutoFillDayOff}
+                  title="Bulk-add rest days for a selected month"
+                >
+                  Auto-fill Rest Days
+                </button>
+              </div>
+            )}
             <FullCalendar
               plugins={[dayGridPlugin, interactionPlugin]}
               initialView="dayGridMonth"
@@ -736,6 +1001,7 @@ export default function WorkSchedule() {
                 const eventType = arg.event.extendedProps?.eventType as
                   | "holiday"
                   | "workSchedule"
+                  | "dayOff"
                   | undefined;
 
                 if (eventType === "holiday") {
@@ -745,6 +1011,14 @@ export default function WorkSchedule() {
                       <div style={{ fontSize: "0.78em", lineHeight: "1.2" }}>
                         {arg.event.title}
                       </div>
+                    </div>
+                  );
+                }
+
+                if (eventType === "dayOff") {
+                  return (
+                    <div>
+                      <strong>Day Off</strong>
                     </div>
                   );
                 }
@@ -778,6 +1052,7 @@ export default function WorkSchedule() {
                 if (selectedEmployee) {
                   const year = arg.start.getFullYear();
                   const month = arg.start.getMonth() + 2; // 0-based
+                  setCurrentCalendarDate(new Date(year, month - 1, 1));
                   fetchAllWorkSchedule(
                     selectedEmployee.employeeId,
                     year,

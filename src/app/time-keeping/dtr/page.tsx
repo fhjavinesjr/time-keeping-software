@@ -65,6 +65,14 @@ type HolidayDTO = {
   isActive: boolean;
 };
 
+type WorkScheduleEntryDTO = {
+  wsId: number;
+  employeeId: string;
+  tsCode: string | null;
+  wsDateTime: string;
+  isDayOff?: boolean;
+};
+
 const toIsoDateKey = (customDate: string): string => {
   const [month, day, year] = customDate.split(" ")[0].split("-");
   return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
@@ -122,6 +130,7 @@ const getHolidayCategory = (holiday: HolidayDTO): HolidayCategory => {
 const buildDTRWithMissingDates = (
   sourceRecords: DTRDailyDTO[],
   holidayMap: Map<string, HolidayDetail[]>,
+  dayOffSet: Set<string>,
   fromCustom: string,
   toCustom: string,
   employeeId?: string
@@ -140,12 +149,22 @@ const buildDTRWithMissingDates = (
   return dateKeys.map((dateKey, index) => {
     const existing = sourceMap.get(dateKey);
     const holidayDetails = holidayMap.get(dateKey) || [];
+    const isRestDay = dayOffSet.has(dateKey);
 
     if (existing) {
       return {
         ...existing,
         holidayDetails,
       };
+    }
+
+    let attendanceStatus: string;
+    if (holidayDetails.length > 0) {
+      attendanceStatus = "HOLIDAY";
+    } else if (isRestDay) {
+      attendanceStatus = "REST DAY";
+    } else {
+      attendanceStatus = "ABSENT";
     }
 
     return {
@@ -156,7 +175,7 @@ const buildDTRWithMissingDates = (
       totalLateMinutes: 0,
       totalUndertimeMinutes: 0,
       totalOvertimeMinutes: 0,
-      attendanceStatus: holidayDetails.length > 0 ? "HOLIDAY" : "ABSENT",
+      attendanceStatus,
       segments: [],
       holidayDetails,
     };
@@ -257,9 +276,24 @@ export default function DTRPage() {
             ]);
           });
 
+        // Fetch work schedules to detect Day Off (isDayOff=true) entries
+        const wsRes = await fetchWithAuth(
+          `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule?employeeId=${selectedEmployee.employeeId}&monthStart=${encodeURIComponent(fromDate)}&monthEnd=${encodeURIComponent(toDate)}`
+        );
+        const dayOffSet = new Set<string>();
+        if (wsRes.status !== 204 && wsRes.ok) {
+          const wsJson: WorkScheduleEntryDTO[] = await wsRes.json();
+          wsJson.forEach((ws) => {
+            if (ws.isDayOff) {
+              dayOffSet.add(toIsoDateKey(ws.wsDateTime));
+            }
+          });
+        }
+
         const recordsWithFilledDates = buildDTRWithMissingDates(
           dtrJson,
           holidayMap,
+          dayOffSet,
           fromDate,
           toDate,
           selectedEmployee.employeeId

@@ -74,6 +74,10 @@
       background-color: #2f855a;
     }
 
+    .dayOffSwatch {
+      background-color: #64748b;
+    }
+
     .legendItem {
       display: flex;
       justify-content: center; /* horizontal center */
@@ -174,6 +178,38 @@
       background-color: #276749 !important;
     }
 
+    :global(.fc-daygrid-event.day-off-event) {
+      background-color: #64748b !important;
+      color: #fff !important;
+      cursor: pointer !important;
+    }
+
+    :global(.fc-daygrid-event.day-off-event:hover) {
+      background-color: #475569 !important;
+    }
+
+  }
+
+  .autoFillContainer {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.75rem;
+  }
+
+  .autoFillButton {
+    padding: 0.45rem 1.1rem;
+    background-color: #475569;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: #334155;
+    }
   }
 
   .saveContainer {

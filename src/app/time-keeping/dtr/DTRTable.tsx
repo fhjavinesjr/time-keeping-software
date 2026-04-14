@@ -61,6 +61,7 @@ const getStatusClass = (status: string) => {
   if (normalized.includes("holiday")) return styles.statusHoliday;
   if (normalized.includes("present")) return styles.statusPresent;
   if (normalized.includes("late")) return styles.statusLate;
+  if (normalized.includes("rest")) return styles.statusRestDay;
   if (normalized.includes("absent")) return styles.statusAbsent;
 
   return styles.statusDefault;
