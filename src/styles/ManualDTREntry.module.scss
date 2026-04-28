@@ -1,0 +1,163 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  width: 100%;
+}
+
+.card {
+  border: 1px solid #e2e6f0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fbfcff 0%, #f5f7fb 100%);
+  padding: 1.5rem;
+  box-shadow: 0 8px 18px rgba(41, 61, 145, 0.08);
+}
+
+.sectionTitle {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7c8ab5;
+  margin: 0 0 0.6rem;
+}
+
+.row {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+
+.one  { grid-template-columns: 1fr; }
+.two  { grid-template-columns: 1fr 1fr; }
+.four { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+
+  label {
+    font-size: 0.82rem;
+    margin-bottom: 0.3rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #465171;
+  }
+
+  input {
+    padding: 0.58rem 0.62rem;
+    border: 1px solid #c7cfe0;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    background: #fff;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+    &:focus {
+      outline: none;
+      border-color: #5a67ba;
+      box-shadow: 0 0 0 3px rgba(90, 103, 186, 0.16);
+    }
+
+    &:read-only {
+      background: #f0f2f8;
+      color: #6b7280;
+      cursor: default;
+    }
+  }
+}
+
+.hint {
+  font-size: 0.76rem;
+  color: #9ca3af;
+  margin-top: 0.3rem;
+}
+
+.scheduleNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  background: #eef1fc;
+  border: 1px solid #c5caed;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: #4c5fb8;
+  font-weight: 600;
+  margin-bottom: 1.2rem;
+}
+
+.preview {
+  margin: 0 0 1.1rem;
+  font-size: 0.85rem;
+  color: #5c6788;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid #e6e9f4;
+  margin: 0.6rem 0 1.2rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 0.75rem;
+}
+
+.saveButton {
+  padding: 0.65rem 1.8rem;
+  background: linear-gradient(120deg, #4c5fb8 0%, #2f87d4 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.2s, filter 0.2s;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.04);
+    box-shadow: 0 8px 16px rgba(53, 93, 190, 0.28);
+  }
+  &:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+.cancelButton {
+  padding: 0.65rem 1.4rem;
+  background: #fff;
+  color: #465171;
+  border: 1.5px solid #c7cfe0;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+
+  &:hover:not(:disabled) {
+    background: #f0f2f8;
+    border-color: #a0aac0;
+  }
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+@media (max-width: 900px) {
+  .four { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 550px) {
+  .four, .two { grid-template-columns: 1fr; }
+}

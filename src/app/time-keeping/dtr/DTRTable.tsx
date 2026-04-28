@@ -42,8 +42,24 @@ type HolidayDetail = {
   category: "regular" | "special" | "working";
 };
 
+type ScheduledTimes = {
+  tsCode: string;
+  tsName: string;
+  timeIn: string;
+  breakOut: string | null;
+  breakIn: string | null;
+  timeOut: string;
+};
+
+type OverlayDetail =
+  | { kind: "PASS_SLIP"; purpose: string; departureTime: string; arrivalTime: string }
+  | { kind: "TIME_CORRECTED"; correctedTimeIn: string; correctedTimeOut: string; correctedBreakOut?: string | null; correctedBreakIn?: string | null }
+  | { kind: "OFFICIAL_ENGAGEMENT"; officialType: string; startDate: string; startTime: string; endDate: string; endTime: string };
+
 type Props = {
   records: DTRDailyDTO[];
+  scheduleMap?: Map<string, ScheduledTimes>;
+  overlayDetailMap?: Map<string, OverlayDetail>;
 };
 
 const formatDate = (dateStr: string) => {
@@ -62,6 +78,11 @@ const getStatusClass = (status: string) => {
   if (normalized.includes("present")) return styles.statusPresent;
   if (normalized.includes("late")) return styles.statusLate;
   if (normalized.includes("rest")) return styles.statusRestDay;
+  if (normalized === "cto") return styles.statusCto;
+  if (normalized.includes("pass slip")) return styles.statusPassSlip;
+  if (normalized.includes("official business") || normalized.includes("official time")) return styles.statusOfficialEngagement;
+  if (normalized.includes("time corrected")) return styles.statusTimeCorrection;
+  if (normalized.includes("leave")) return styles.statusLeave;
   if (normalized.includes("absent")) return styles.statusAbsent;
 
   return styles.statusDefault;
@@ -69,8 +90,14 @@ const getStatusClass = (status: string) => {
 
 const formatHolidayType = (value: string) => value.replaceAll("_", " ");
 
-export default function DTRTable({ records }: Props) {
+export default function DTRTable({ records, scheduleMap = new Map(), overlayDetailMap = new Map() }: Props) {
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [scheduleExpanded, setScheduleExpanded] = useState<number | null>(null);
+
+  const toIsoKey = (dateStr: string): string => {
+    const [month, day, year] = dateStr.split(" ")[0].split("-");
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  };
 
   const handleExpand = (idx: number) => {
     setExpanded(expanded === idx ? null : idx);
@@ -103,10 +130,14 @@ export default function DTRTable({ records }: Props) {
               <th>Under</th>
               <th>Over</th>
               <th>Segments</th>
+              <th>Schedule</th>
             </tr>
           </thead>
           <tbody>
-            {records.map((rec, idx) => (
+            {records.map((rec, idx) => {
+              const scheduled = scheduleMap.get(toIsoKey(rec.workDate));
+              const overlayDetail = overlayDetailMap.get(toIsoKey(rec.workDate));
+              return (
               <React.Fragment key={rec.dtrDailyId}>
                 <tr>
                   <td>
@@ -167,6 +198,27 @@ export default function DTRTable({ records }: Props) {
                       >
                         {expanded === idx ? "Hide" : "Show"}
                       </button>
+                    ) : overlayDetail ? (
+                      <button
+                        className={styles.segmentToggleButton}
+                        aria-label={expanded === idx ? "Hide details" : "Show details"}
+                        onClick={() => handleExpand(idx)}
+                      >
+                        {expanded === idx ? "Hide" : "Show"}
+                      </button>
+                    ) : (
+                      <span className={styles.noSegmentText}>-</span>
+                    )}
+                  </td>
+                  <td>
+                    {scheduled ? (
+                      <button
+                        className={styles.scheduleToggleButton}
+                        aria-label={scheduleExpanded === idx ? "Hide schedule" : "Show schedule"}
+                        onClick={() => setScheduleExpanded(scheduleExpanded === idx ? null : idx)}
+                      >
+                        {scheduleExpanded === idx ? "Hide" : "Show"}
+                      </button>
                     ) : (
                       <span className={styles.noSegmentText}>-</span>
                     )}
@@ -174,7 +226,8 @@ export default function DTRTable({ records }: Props) {
                 </tr>
                 {expanded === idx && (
                   <tr>
-                    <td className={styles.segmentCell} colSpan={7}>
+                    <td className={styles.segmentCell} colSpan={8}>
+                      {rec.segments && rec.segments.length > 0 ? (
                       <div className={styles.segmentPanel}>
                         <table className={styles.segmentTable}>
                           <thead>
@@ -203,8 +256,7 @@ export default function DTRTable({ records }: Props) {
                             </tr>
                           </thead>
                           <tbody>
-                            {rec.segments && rec.segments.length > 0 ? (
-                              rec.segments.map((seg) => {
+                            {rec.segments.map((seg) => {
                                 const overnight = isOvernightSegment(seg);
 
                                 return (
@@ -244,14 +296,99 @@ export default function DTRTable({ records }: Props) {
                                     <td>{seg.overtimeMinutes}</td>
                                   </tr>
                                 );
-                              })
-                            ) : (
-                              <tr>
-                                <td className={styles.noSegments} colSpan={10}>
-                                  No segments
-                                </td>
-                              </tr>
-                            )}
+                              })}
+                          </tbody>
+                        </table>
+                      </div>
+                      ) : overlayDetail ? (
+                        <div className={styles.overlayPanel}>
+                          {overlayDetail.kind === "PASS_SLIP" && (
+                            <table className={styles.overlayTable}>
+                              <thead>
+                                <tr>
+                                  <th>Purpose</th>
+                                  <th>Departure Time</th>
+                                  <th>Arrival Time</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <td>{overlayDetail.purpose}</td>
+                                  <td>{formatTime(overlayDetail.departureTime)}</td>
+                                  <td>{formatTime(overlayDetail.arrivalTime)}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          )}
+                          {overlayDetail.kind === "TIME_CORRECTED" && (
+                            <table className={styles.overlayTable}>
+                              <thead>
+                                <tr>
+                                  <th>Corrected Time In</th>
+                                  <th>Break Out</th>
+                                  <th>Break In</th>
+                                  <th>Corrected Time Out</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <td>{formatTime(overlayDetail.correctedTimeIn)}</td>
+                                  <td>{overlayDetail.correctedBreakOut ? formatTime(overlayDetail.correctedBreakOut) : "—"}</td>
+                                  <td>{overlayDetail.correctedBreakIn ? formatTime(overlayDetail.correctedBreakIn) : "—"}</td>
+                                  <td>{formatTime(overlayDetail.correctedTimeOut)}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          )}
+                          {overlayDetail.kind === "OFFICIAL_ENGAGEMENT" && (
+                            <table className={styles.overlayTable}>
+                              <thead>
+                                <tr>
+                                  <th>Type</th>
+                                  <th>Start Date</th>
+                                  <th>Start Time</th>
+                                  <th>End Date</th>
+                                  <th>End Time</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <td>{overlayDetail.officialType}</td>
+                                  <td>{overlayDetail.startDate}</td>
+                                  <td>{formatTime(overlayDetail.startTime)}</td>
+                                  <td>{overlayDetail.endDate}</td>
+                                  <td>{formatTime(overlayDetail.endTime)}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      ) : null}
+                    </td>
+                  </tr>
+                )}
+                {scheduleExpanded === idx && scheduled && (
+                  <tr>
+                    <td className={styles.scheduleCell} colSpan={8}>
+                      <div className={styles.schedulePanel}>
+                        <table className={styles.scheduleTable}>
+                          <thead>
+                            <tr>
+                              <th>Shift</th>
+                              <th>Time In</th>
+                              <th>Break Out</th>
+                              <th>Break In</th>
+                              <th>Time Out</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td>{scheduled.tsName} ({scheduled.tsCode})</td>
+                              <td>{formatTime(scheduled.timeIn)}</td>
+                              <td>{scheduled.breakOut ? formatTime(scheduled.breakOut) : "\u2014"}</td>
+                              <td>{scheduled.breakIn ? formatTime(scheduled.breakIn) : "\u2014"}</td>
+                              <td>{formatTime(scheduled.timeOut)}</td>
+                            </tr>
                           </tbody>
                         </table>
                       </div>
@@ -259,7 +396,8 @@ export default function DTRTable({ records }: Props) {
                   </tr>
                 )}
               </React.Fragment>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

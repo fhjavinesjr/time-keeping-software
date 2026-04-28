@@ -824,10 +824,12 @@ export default function WorkSchedule() {
         icon: "success",
         returnFocus: false,
       });
+      // Use year/monthNum from formValues directly — currentCalendarDate can
+      // lag or point to the wrong month depending on how datesSet fired.
       fetchAllWorkSchedule(
         selectedEmployee.employeeId,
-        currentCalendarDate.getFullYear(),
-        currentCalendarDate.getMonth() + 1
+        year,
+        monthNum
       );
     } catch (err) {
       console.error("Error auto-filling rest days:", err);
@@ -1050,8 +1052,16 @@ export default function WorkSchedule() {
               }}
               datesSet={(arg) => {
                 if (selectedEmployee) {
-                  const year = arg.start.getFullYear();
-                  const month = arg.start.getMonth() + 2; // 0-based
+                  // Use the midpoint of the visible range to reliably get
+                  // the displayed month (arg.start can be in the previous month
+                  // when the month doesn't start on Sunday, but equals the
+                  // 1st of the displayed month when it does — midpoint is always
+                  // inside the correct month).
+                  const midDate = new Date(
+                    (arg.start.getTime() + arg.end.getTime()) / 2
+                  );
+                  const year = midDate.getFullYear();
+                  const month = midDate.getMonth() + 1;
                   setCurrentCalendarDate(new Date(year, month - 1, 1));
                   fetchAllWorkSchedule(
                     selectedEmployee.employeeId,

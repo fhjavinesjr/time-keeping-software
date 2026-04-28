@@ -75,9 +75,10 @@ export default function LoginPage() {
       }
 
       const employees: Employee[] = await empRes.json();
-      localStorageUtil.setEmployees(employees); //Store employees list to be used later in other module
+      const filtered = employees.filter((emp) => emp.employeeNo !== "admin");
+      localStorageUtil.setEmployees(filtered); //Store employees list to be used later in other module
 
-      // Identify current employee
+      // Identify current employee (use unfiltered list so admin can also get their role set)
       const currentEmp = employees.find(emp => emp.employeeNo === employeeNo);
 
       if (currentEmp) {
