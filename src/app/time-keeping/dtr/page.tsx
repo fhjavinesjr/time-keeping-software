@@ -257,6 +257,17 @@ const buildDTRWithMissingDates = (
   });
 };
 
+type EditSegmentState = {
+  record: DTRDailyDTO;
+  segment: DTRSegmentDTO;
+  timeIn: string;
+  breakOut: string;
+  breakIn: string;
+  timeOut: string;
+};
+
+const toTimeStr = (t: string): string => (t.length === 5 ? `${t}:00` : t);
+
 export default function DTRPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -270,6 +281,9 @@ export default function DTRPage() {
   const [holidays, setHolidays] = useState<HolidayDTO[]>([]);
   const [scheduleMap, setScheduleMap] = useState<Map<string, ScheduledTimes>>(new Map());
   const [overlayDetailMap, setOverlayDetailMap] = useState<Map<string, OverlayDetail>>(new Map());
+  const [editSegmentState, setEditSegmentState] = useState<EditSegmentState | null>(null);
+  const [isSavingSegment, setIsSavingSegment] = useState(false);
+  const [dayOffDates, setDayOffDates] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const storedEmployees = localStorageUtil.getEmployees();
@@ -285,17 +299,23 @@ export default function DTRPage() {
 
   useEffect(() => {
     const role = localStorageUtil.getEmployeeRole();
-    const fullname = localStorageUtil.getEmployeeFullname();
     const empNo = localStorageUtil.getEmployeeNo();
+    const fullname = localStorageUtil.getEmployeeFullname();
     const employeeId = localStorageUtil.getEmployeeId();
 
     setUserRole(role);
 
     // Admin (role "1") manages other employees — leave selectedEmployee null
     // so they must pick from the datalist. Non-admin sees their own record (read-only).
-    if (fullname && empNo && role !== "1") {
-      const emp = { employeeId: employeeId, employeeNo: empNo, fullName: fullname } as Employee;
-      setSelectedEmployee(emp);
+    if (role !== "1" && empNo) {
+      const storedList = localStorageUtil.getEmployees();
+      const empFromList = storedList?.find(e => e.employeeNo === empNo) ?? null;
+      if (empFromList) {
+        setSelectedEmployee(empFromList);
+      } else if (fullname) {
+        const emp = { employeeId: employeeId, employeeNo: empNo, fullName: fullname } as Employee;
+        setSelectedEmployee(emp);
+      }
     }
   }, []);
 
@@ -672,6 +692,7 @@ export default function DTRPage() {
             });
           }
           setScheduleMap(scheduledTimesMap204);
+          setDayOffDates(new Set(dayOffSet));
           const [leaveMap204, ctoSet204, passSlipDetailMap204, oeDetailMap204, tcDetailMap204] = await Promise.all([
             fetchLeaveMap(selectedEmployee.employeeId),
             fetchCtoSet(selectedEmployee.employeeId),
@@ -747,6 +768,7 @@ export default function DTRPage() {
           });
         }
         setScheduleMap(scheduledTimesMap);
+        setDayOffDates(new Set(dayOffSet));
 
         const [leaveMap, ctoSet, passSlipDetailMap, oeDetailMap, tcDetailMap] = await Promise.all([
           fetchLeaveMap(selectedEmployee.employeeId),
@@ -830,6 +852,168 @@ export default function DTRPage() {
       return map;
     } catch {
       return new Map();
+    }
+  };
+
+  const handleEditSegment = (record: DTRDailyDTO, segment: DTRSegmentDTO) => {
+    setEditSegmentState({
+      record,
+      segment,
+      timeIn: segment.timeIn?.substring(0, 5) ?? "",
+      breakOut: segment.breakOut?.substring(0, 5) ?? "",
+      breakIn: segment.breakIn?.substring(0, 5) ?? "",
+      timeOut: segment.timeOut?.substring(0, 5) ?? "",
+    });
+  };
+
+  const handleSaveEditSegment = async () => {
+    if (!editSegmentState) return;
+    const { record, segment, timeIn, breakOut, breakIn, timeOut } = editSegmentState;
+
+    if (!timeIn) {
+      Swal.fire("Validation Error", "Time In is required.", "warning");
+      return;
+    }
+
+    const dateKey = toIsoDateKey(record.workDate);
+    const scheduled = scheduleMap.get(dateKey);
+    const SCHED_IN  = scheduled ? timeToMinutes(scheduled.timeIn)  : 8 * 60;
+    const SCHED_OUT = scheduled ? timeToMinutes(scheduled.timeOut) : 17 * 60;
+
+    const inMin = timeToMinutes(timeIn);
+
+    // If Time Out is empty the segment is still open — compute what we can from available times
+    let workMinutes = 0, lateMinutes = 0, undertimeMinutes = 0, overtimeMinutes = 0;
+
+    // Determine the last known time and break deduction based on what fields are filled.
+    // Rules:
+    //   - Time Out present              → last = Time Out;  break = BreakOut→BreakIn if both present
+    //   - Break In present, no Time Out → last = Break In;  break = BreakOut→BreakIn
+    //   - Break Out only, no Break In   → last = Break Out; break = 0 (employee left during break)
+    //   - Only Time In                  → nothing to compute yet
+    if (timeOut || breakOut) {
+      let lastMin: number;
+      let breakMins = 0;
+
+      if (timeOut) {
+        lastMin = timeToMinutes(timeOut);
+        if (lastMin < inMin) lastMin += 24 * 60; // overnight
+        if (breakOut && breakIn) {
+          breakMins = Math.max(0, timeToMinutes(breakIn) - timeToMinutes(breakOut));
+        }
+      } else if (breakIn) {
+        // Back from break but no Time Out yet — last known = Break In; work excludes break time
+        const breakInMin  = timeToMinutes(breakIn);
+        const breakOutMin = timeToMinutes(breakOut!);
+        breakMins = Math.max(0, breakInMin - breakOutMin);
+        lastMin   = breakInMin;
+      } else {
+        // Only Break Out — last known = Break Out (departed during/at break)
+        lastMin = timeToMinutes(breakOut!);
+      }
+
+      workMinutes      = Math.max(0, lastMin - inMin - breakMins);
+      lateMinutes      = Math.max(0, inMin - SCHED_IN);
+      undertimeMinutes = lastMin < SCHED_OUT ? Math.max(0, SCHED_OUT - lastMin) : 0;
+      overtimeMinutes  = lastMin > SCHED_OUT ? Math.max(0, lastMin - SCHED_OUT) : 0;
+    }
+
+    const updatedSegment: DTRSegmentDTO = {
+      ...segment,
+      timeIn:   toTimeStr(timeIn),
+      breakOut: breakOut ? toTimeStr(breakOut) : null,
+      breakIn:  breakIn  ? toTimeStr(breakIn)  : null,
+      timeOut:  timeOut  ? toTimeStr(timeOut)  : null,
+      workMinutes,
+      lateMinutes,
+      undertimeMinutes,
+      overtimeMinutes,
+    };
+
+    const updatedSegments = record.segments.map((s) =>
+      s.dtrSegmentId === segment.dtrSegmentId ? updatedSegment : s
+    );
+
+    const totalWorkMinutes = updatedSegments.reduce((sum, s) => sum + s.workMinutes, 0);
+    const totalLateMinutes = updatedSegments.reduce((sum, s) => sum + s.lateMinutes, 0);
+    const totalUndertimeMinutes = updatedSegments.reduce((sum, s) => sum + s.undertimeMinutes, 0);
+    const totalOvertimeMinutes = updatedSegments.reduce((sum, s) => sum + s.overtimeMinutes, 0);
+
+    const payload: DTRDailyDTO = {
+      ...record,
+      segments: updatedSegments,
+      totalWorkMinutes,
+      totalLateMinutes,
+      totalUndertimeMinutes,
+      totalOvertimeMinutes,
+    };
+
+    setIsSavingSegment(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL_TIMEKEEPING}/api/dtr-daily`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+      setEditSegmentState(null);
+      await Swal.fire({ title: "Saved", text: "Segment updated successfully.", icon: "success", timer: 1500, showConfirmButton: false });
+      fetchDTR();
+    } catch {
+      Swal.fire("Error", "Failed to update segment.", "error");
+    } finally {
+      setIsSavingSegment(false);
+    }
+  };
+
+  const handleDeleteSegment = async (record: DTRDailyDTO, segment: DTRSegmentDTO) => {
+    const confirm = await Swal.fire({
+      title: "Delete Segment?",
+      text: `Remove segment ${segment.segmentNo} from ${record.workDate.split(" ")[0]}?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#dc2626",
+    });
+    if (!confirm.isConfirmed) return;
+
+    const updatedSegments = record.segments.filter(
+      (s) => s.dtrSegmentId !== segment.dtrSegmentId
+    );
+
+    const totalWorkMinutes = updatedSegments.reduce((sum, s) => sum + s.workMinutes, 0);
+    const totalLateMinutes = updatedSegments.reduce((sum, s) => sum + s.lateMinutes, 0);
+    const totalUndertimeMinutes = updatedSegments.reduce((sum, s) => sum + s.undertimeMinutes, 0);
+    const totalOvertimeMinutes = updatedSegments.reduce((sum, s) => sum + s.overtimeMinutes, 0);
+
+    const payload: DTRDailyDTO = {
+      ...record,
+      segments: updatedSegments,
+      totalWorkMinutes,
+      totalLateMinutes,
+      totalUndertimeMinutes,
+      totalOvertimeMinutes,
+      attendanceStatus: (() => {
+        if (updatedSegments.length > 0) return record.attendanceStatus;
+        const isoKey = toIsoDateKey(record.workDate);
+        if ((record.holidayDetails?.length ?? 0) > 0) return "HOLIDAY";
+        if (dayOffDates.has(isoKey)) return "REST DAY";
+        return "ABSENT";
+      })(),
+    };
+
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL_TIMEKEEPING}/api/dtr-daily`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+      await Swal.fire({ title: "Deleted", text: "Segment deleted.", icon: "success", timer: 1500, showConfirmButton: false });
+      fetchDTR();
+    } catch {
+      Swal.fire("Error", "Failed to delete segment.", "error");
     }
   };
 
@@ -942,11 +1126,94 @@ export default function DTRPage() {
               </div>
             </div>
             {records.length > 0 && (
-              <DTRTable records={records} scheduleMap={scheduleMap} overlayDetailMap={overlayDetailMap} />
+              <DTRTable
+                records={records}
+                scheduleMap={scheduleMap}
+                overlayDetailMap={overlayDetailMap}
+                userRole={userRole}
+                onEditSegment={handleEditSegment}
+                onDeleteSegment={handleDeleteSegment}
+              />
             )}
           </div>
         </div>
       </div>
+
+      {/* Edit Segment Modal — admin only */}
+      {editSegmentState && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget && !isSavingSegment) setEditSegmentState(null); }}
+        >
+          <div
+            style={{
+              background: "#fff", borderRadius: 14,
+              padding: "2rem 2.2rem", minWidth: 360, maxWidth: 480, width: "100%",
+              boxShadow: "0 12px 40px rgba(30,60,120,0.18)",
+            }}
+          >
+            <h3 style={{ margin: "0 0 1.2rem", fontSize: "1.1rem", fontWeight: 700, color: "#243058" }}>
+              Edit Segment {editSegmentState.segment.segmentNo} — {editSegmentState.record.workDate.split(" ")[0]}
+            </h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.9rem 1.2rem" }}>
+              {(
+                [
+                  { label: "Time In *", key: "timeIn" as const },
+                  { label: "Time Out", key: "timeOut" as const },
+                  { label: "Break Out", key: "breakOut" as const },
+                  { label: "Break In", key: "breakIn" as const },
+                ] as const
+              ).map(({ label, key }) => (
+                <div key={key} style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                  <label style={{ fontSize: "0.82rem", fontWeight: 600, color: "#445180" }}>{label}</label>
+                  <input
+                    type="time"
+                    value={editSegmentState[key]}
+                    disabled={isSavingSegment}
+                    onChange={(e) =>
+                      setEditSegmentState((prev) => prev ? { ...prev, [key]: e.target.value } : prev)
+                    }
+                    style={{
+                      padding: "0.45rem 0.6rem", borderRadius: 7,
+                      border: "1px solid #c5cfe8", fontSize: "0.95rem",
+                      background: isSavingSegment ? "#f3f4f6" : "#fff",
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: "0.8rem", justifyContent: "flex-end", marginTop: "1.5rem" }}>
+              <button
+                onClick={() => setEditSegmentState(null)}
+                disabled={isSavingSegment}
+                style={{
+                  padding: "0.55rem 1.3rem", borderRadius: 8, border: "1px solid #d1d5db",
+                  background: "#f9fafb", fontWeight: 600, fontSize: "0.9rem",
+                  cursor: isSavingSegment ? "not-allowed" : "pointer", color: "#374151",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEditSegment}
+                disabled={isSavingSegment}
+                style={{
+                  padding: "0.55rem 1.4rem", borderRadius: 8, border: "none",
+                  background: isSavingSegment ? "#94a3b8" : "linear-gradient(120deg,#4c5fb8 0%,#2f87d4 100%)",
+                  color: "#fff", fontWeight: 700, fontSize: "0.9rem",
+                  cursor: isSavingSegment ? "not-allowed" : "pointer",
+                }}
+              >
+                {isSavingSegment ? "Saving…" : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Main>
   );
 }

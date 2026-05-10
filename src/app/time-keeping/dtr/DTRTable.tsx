@@ -60,6 +60,9 @@ type Props = {
   records: DTRDailyDTO[];
   scheduleMap?: Map<string, ScheduledTimes>;
   overlayDetailMap?: Map<string, OverlayDetail>;
+  userRole?: string | null;
+  onEditSegment?: (record: DTRDailyDTO, segment: DTRSegmentDTO) => void;
+  onDeleteSegment?: (record: DTRDailyDTO, segment: DTRSegmentDTO) => void;
 };
 
 const formatDate = (dateStr: string) => {
@@ -90,7 +93,7 @@ const getStatusClass = (status: string) => {
 
 const formatHolidayType = (value: string) => value.replaceAll("_", " ");
 
-export default function DTRTable({ records, scheduleMap = new Map(), overlayDetailMap = new Map() }: Props) {
+export default function DTRTable({ records, scheduleMap = new Map(), overlayDetailMap = new Map(), userRole, onEditSegment, onDeleteSegment }: Props) {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [scheduleExpanded, setScheduleExpanded] = useState<number | null>(null);
 
@@ -253,6 +256,7 @@ export default function DTRTable({ records, scheduleMap = new Map(), overlayDeta
                               <th>Late</th>
                               <th>Under</th>
                               <th>Over</th>
+                              {userRole === "1" && <th>Actions</th>}
                             </tr>
                           </thead>
                           <tbody>
@@ -294,6 +298,22 @@ export default function DTRTable({ records, scheduleMap = new Map(), overlayDeta
                                     <td>{seg.lateMinutes}</td>
                                     <td>{seg.undertimeMinutes}</td>
                                     <td>{seg.overtimeMinutes}</td>
+                                    {userRole === "1" && (
+                                      <td className={styles.actionCell}>
+                                        <button
+                                          className={styles.editSegBtn}
+                                          onClick={() => onEditSegment?.(rec, seg)}
+                                        >
+                                          Edit
+                                        </button>
+                                        <button
+                                          className={styles.deleteSegBtn}
+                                          onClick={() => onDeleteSegment?.(rec, seg)}
+                                        >
+                                          Delete
+                                        </button>
+                                      </td>
+                                    )}
                                   </tr>
                                 );
                               })}

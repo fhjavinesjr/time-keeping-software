@@ -9,13 +9,6 @@ import { useRouter } from "next/navigation";
 
 const menuItems = [
   {
-    id: 1,
-    icon: "/dashboard.png",
-    label: "Dashboard",
-    goto: "/time-keeping/dashboard",
-    isActive: true,
-  },
-  {
     id: 2,
     icon: "/time_keeping.png",
     label: "Daily Time Record",

@@ -10,7 +10,33 @@ import { fetchWithAuth } from "@/lib/utils/fetchWithAuth";
 import { localStorageUtil } from "@/lib/utils/localStorageUtil";
 import { Employee } from "@/lib/types/Employee";
 
-const API_BASE_URL_TIMEKEEPING = process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
+const API_BASE_URL_TIMEKEEPING   = process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
+const API_BASE_URL_ADMINISTRATIVE = process.env.NEXT_PUBLIC_API_BASE_URL_ADMINISTRATIVE;
+
+type HolidayDTO = {
+  holidayDate: string;
+  observedDate?: string | null;
+  holidayType: string;
+  isWorkingHoliday: boolean;
+  isActive: boolean;
+};
+
+type WorkScheduleEntryDTO = {
+  wsDateTime: string;
+  isDayOff?: boolean;
+};
+
+// Convert "MM-dd-yyyy HH:mm:ss" or "MM-dd-yyyy" custom format → "yyyy-MM-dd"
+const toIsoKey = (customDate: string): string => {
+  const [month, day, year] = customDate.split(" ")[0].split("-");
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+};
+
+// Convert "yyyy-MM-dd" HTML date input → "MM-dd-yyyy 00:00:00" for API params
+const toApiFormat = (isoDate: string): string => {
+  const [year, month, day] = isoDate.split("-");
+  return `${month}-${day}-${year} 00:00:00`;
+};
 
 // Standard PH government schedule in minutes from midnight
 const SCHEDULE_IN_MIN  = 8 * 60;   // 08:00
@@ -88,16 +114,21 @@ export default function ManualDTREntryPage() {
 
     setUserRole(role);
 
-    if (fullname && empNo && role !== "1") {
-      setSelectedEmployee({
-        employeeId,
-        employeeNo: empNo,
-        fullName: fullname,
-      } as Employee);
-    }
-
     const stored = localStorageUtil.getEmployees();
     if (stored?.length > 0) setEmployees(stored);
+
+    if (role !== "1" && empNo) {
+      const empFromList = stored?.find(e => e.employeeNo === empNo) ?? null;
+      if (empFromList) {
+        setSelectedEmployee(empFromList as Employee);
+      } else if (fullname) {
+        setSelectedEmployee({
+          employeeId,
+          employeeNo: empNo,
+          fullName: fullname,
+        } as Employee);
+      }
+    }
   }, []);
 
   const handleSave = async () => {
@@ -127,10 +158,60 @@ export default function ManualDTREntryPage() {
       computeMinutes(timeIn, breakOut, breakIn, timeOut);
 
     setSaving(true);
+
+    // ── Pre-fetch holidays and work schedule to skip day-off / non-working holiday dates ──
+    const nonWorkingHolidaySet = new Set<string>();
+    const dayOffSet            = new Set<string>();
+
+    try {
+      const [holidayRes, wsRes] = await Promise.all([
+        fetchWithAuth(`${API_BASE_URL_ADMINISTRATIVE}/api/holiday/get-all`),
+        fetchWithAuth(
+          `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule` +
+          `?employeeId=${selectedEmployee.employeeId}` +
+          `&monthStart=${encodeURIComponent(toApiFormat(dateFrom))}` +
+          `&monthEnd=${encodeURIComponent(toApiFormat(dateTo))}`
+        ),
+      ]);
+
+      if (holidayRes.ok) {
+        const holidays: HolidayDTO[] = await holidayRes.json();
+        holidays
+          .filter((h) => h.isActive && !h.isWorkingHoliday && h.holidayType !== "SPECIAL_WORKING")
+          .forEach((h) => {
+            const raw = h.observedDate?.trim() && h.observedDate !== h.holidayDate
+              ? h.observedDate
+              : h.holidayDate;
+            nonWorkingHolidaySet.add(toIsoKey(raw));
+          });
+      }
+
+      if (wsRes.ok && wsRes.status !== 204) {
+        const wsData: WorkScheduleEntryDTO[] = await wsRes.json();
+        wsData.forEach((ws) => {
+          if (ws.isDayOff) dayOffSet.add(toIsoKey(ws.wsDateTime));
+        });
+      }
+    } catch {
+      // If schedule/holiday fetch fails, proceed without filtering so admin isn't blocked
+    }
+
     let successCount = 0;
-    const failedDates: string[] = [];
+    const failedDates:          string[] = [];
+    const skippedHolidayDates:  string[] = [];
+    const skippedDayOffDates:   string[] = [];
 
     for (const date of dates) {
+      const isoKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+      if (nonWorkingHolidaySet.has(isoKey)) {
+        skippedHolidayDates.push(formatWorkDate(date).split(" ")[0]);
+        continue;
+      }
+      if (dayOffSet.has(isoKey)) {
+        skippedDayOffDates.push(formatWorkDate(date).split(" ")[0]);
+        continue;
+      }
       const payload = {
         employeeId:             selectedEmployee.employeeId,
         workDate:               formatWorkDate(date),
@@ -175,7 +256,23 @@ export default function ManualDTREntryPage() {
 
     setSaving(false);
 
-    if (failedDates.length === 0) {
+    const skippedLines: string[] = [];
+    if (skippedHolidayDates.length > 0)
+      skippedLines.push(`<b>Skipped (Non-working holiday):</b> ${skippedHolidayDates.join(", ")}`);
+    if (skippedDayOffDates.length > 0)
+      skippedLines.push(`<b>Skipped (Day Off):</b> ${skippedDayOffDates.join(", ")}`);
+    if (failedDates.length > 0)
+      skippedLines.push(`<b>Failed (may already exist):</b> ${failedDates.join(", ")}`);
+
+    if (successCount === 0 && failedDates.length === 0) {
+      // Everything was skipped — no records written
+      Swal.fire({
+        title: "Nothing Saved",
+        html: `All dates in the range were skipped.<br/>${skippedLines.join("<br/>") }`,
+        icon: "info",
+        confirmButtonText: "OK",
+      });
+    } else if (skippedLines.length === 0) {
       await Swal.fire({
         title:             "Success",
         text:              `${successCount} DTR record(s) saved successfully.`,
@@ -184,12 +281,13 @@ export default function ManualDTREntryPage() {
       });
       router.push("/time-keeping/dtr");
     } else {
-      Swal.fire({
-        title: "Partial Result",
-        html: `${successCount} saved.<br/>Failed dates (record may already exist):<br/><b>${failedDates.join(", ")}</b>`,
-        icon: "warning",
+      await Swal.fire({
+        title: "Done",
+        html:  `${successCount} DTR record(s) saved.<br/><br/>${skippedLines.join("<br/>")}`,
+        icon:  failedDates.length > 0 ? "warning" : "success",
         confirmButtonText: "OK",
       });
+      if (successCount > 0) router.push("/time-keeping/dtr");
     }
   };
 

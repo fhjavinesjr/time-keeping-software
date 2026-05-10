@@ -226,6 +226,13 @@ export default function WorkSchedule() {
     if (emp) {
       setSelectedEmployee(emp);
       setEmployeeInputValue(`[${emp.employeeNo}] ${emp.fullName}`);
+    } else if (employeeNo && role !== "1") {
+      // Fallback when employees list is empty: use individual localStorage keys
+      const fullname = localStorageUtil.getEmployeeFullname();
+      if (fullname) {
+        setSelectedEmployee({ employeeId: employeeId ?? "", employeeNo, fullName: fullname, role: role ?? "" } as Employee);
+        setEmployeeInputValue(`[${employeeNo}] ${fullname}`);
+      }
     }
 
     fetchTimeShifts();
