@@ -1,10 +1,7 @@
-import { localStorageUtil } from '../../lib/utils/localStorageUtil';
+import type { NextApiRequest, NextApiResponse } from 'next';
 
-export const logout = () => {
-  localStorageUtil.clear(); // Clear localStorage token
-
-  // Optional: Clear additional data (user info, etc.)
-
-  // Redirect to login page (can be customized)
-  window.location.href = '/login';
-};
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Clear the auth cookie on the server side
+  res.setHeader('Set-Cookie', 'token=; Path=/; HttpOnly; Max-Age=0; SameSite=Strict');
+  res.status(200).json({ message: 'Logged out successfully' });
+}
