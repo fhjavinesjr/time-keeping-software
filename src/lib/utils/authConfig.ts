@@ -16,5 +16,5 @@ export const AUTH_CONFIG = {
     "/time-keeping/registration",
   ],
 
-  INACTIVITY_LIMIT: 60, // seconds
+  INACTIVITY_LIMIT: parseInt(process.env.NEXT_PUBLIC_INACTIVITY_TIMEOUT ?? '1800', 10), // seconds (configurable via NEXT_PUBLIC_INACTIVITY_TIMEOUT)
 };
