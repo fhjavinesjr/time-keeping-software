@@ -26,13 +26,6 @@ const menuItems = [
 
 const otherItems = [
   {
-    id: 4,
-    icon: "/accounts.png",
-    label: "Accounts",
-    goto: "/time-keeping/accounts",
-    isActive: false,
-  },
-  {
     id: 5,
     icon: "/help.png",
     label: "Help",
