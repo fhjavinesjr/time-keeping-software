@@ -9,14 +9,14 @@ import { useRouter } from "next/navigation";
 
 const menuItems = [
   {
-    id: 2,
+    id: 1,
     icon: "/time_keeping.png",
     label: "Daily Time Record",
     goto: "/time-keeping/dtr",
     isActive: false,
   },
   {
-    id: 3,
+    id: 2,
     icon: "/time_shift.png",
     label: "Work Schedule",
     goto: "/time-keeping/workschedule",
@@ -26,14 +26,14 @@ const menuItems = [
 
 const otherItems = [
   {
-    id: 5,
+    id: 1,
     icon: "/help.png",
     label: "Help",
     goto: "/time-keeping",
     isActive: false,
   },
   {
-    id: 6,
+    id: 2,
     icon: "/logout.png",
     label: "Logout",
     action: "logout",
