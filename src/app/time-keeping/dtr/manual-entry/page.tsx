@@ -1,5 +1,6 @@
 "use client";
 
+import { runtimeConfig } from "@/lib/utils/runtimeConfig";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Main from "../../main/Main";
@@ -10,8 +11,8 @@ import { fetchWithAuth } from "@/lib/utils/fetchWithAuth";
 import { localStorageUtil } from "@/lib/utils/localStorageUtil";
 import { Employee } from "@/lib/types/Employee";
 
-const API_BASE_URL_TIMEKEEPING   = process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
-const API_BASE_URL_ADMINISTRATIVE = process.env.NEXT_PUBLIC_API_BASE_URL_ADMINISTRATIVE;
+const API_BASE_URL_TIMEKEEPING   = runtimeConfig.getApiUrl("timekeeping");
+const API_BASE_URL_ADMINISTRATIVE = runtimeConfig.getApiUrl("administrative");
 
 type HolidayDTO = {
   holidayDate: string;

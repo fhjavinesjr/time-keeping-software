@@ -1,5 +1,6 @@
 "use client";
 
+import { runtimeConfig } from "@/lib/utils/runtimeConfig";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import DTRTable from "./DTRTable";
@@ -16,11 +17,11 @@ import {
 import { localStorageUtil } from "@/lib/utils/localStorageUtil";
 import { Employee } from "@/lib/types/Employee";
 const API_BASE_URL_TIMEKEEPING =
-  process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
+  runtimeConfig.getApiUrl("timekeeping");
 const API_BASE_URL_ADMINISTRATIVE =
-  process.env.NEXT_PUBLIC_API_BASE_URL_ADMINISTRATIVE;
+  runtimeConfig.getApiUrl("administrative");
 const API_BASE_URL_HRM =
-  process.env.NEXT_PUBLIC_API_BASE_URL_HRM;
+  runtimeConfig.getApiUrl("hrm");
 
 type DTRSegmentDTO = {
   dtrSegmentId: number;

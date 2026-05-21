@@ -123,6 +123,7 @@ export default function DTRTable({ records, scheduleMap = new Map(), overlayDeta
           Working
         </span>
       </div>
+      <div className={styles.tableScrollWrapper}>
       <table className={styles.summaryTable}>
         <thead>
           <tr>
@@ -420,6 +421,7 @@ export default function DTRTable({ records, scheduleMap = new Map(), overlayDeta
             })}
           </tbody>
         </table>
+      </div>
       </div>
   );
 }

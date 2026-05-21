@@ -2,12 +2,13 @@
 
 export const dynamic = "force-dynamic"; //It ensures the page is always rendered dynamically (server-rendered or client-rendered) and skips static generation during build time.
 
+import { runtimeConfig } from "@/lib/utils/runtimeConfig";
 import React from "react";
 import styles from "@/styles/RegistrationForm.module.scss";
 import InputFieldForm from "../../../components/registration/InputFieldForm";
 import { useRouter } from "next/navigation"; //use next/navigation if the page is dynamic (server-rendered or client-rendered)
 import Swal from "sweetalert2";
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
+const API_BASE_URL = runtimeConfig.getApiUrl("timekeeping");
 
 export default function Registration() {
   const router = useRouter();

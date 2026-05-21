@@ -1,5 +1,6 @@
 "use client";
 
+import { runtimeConfig } from "@/lib/utils/runtimeConfig";
 import { useCallback, useEffect, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -18,9 +19,9 @@ import {
   getLastDateOfMonth,
 } from "@/lib/utils/dateFormatUtils";
 const API_BASE_URL_ADMINISTRATIVE =
-  process.env.NEXT_PUBLIC_API_BASE_URL_ADMINISTRATIVE;
+  runtimeConfig.getApiUrl("administrative");
 const API_BASE_URL_TIMEKEEPING =
-  process.env.NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING;
+  runtimeConfig.getApiUrl("timekeeping");
 import to12HourFormat from "@/lib/utils/convert24To12HrFormat";
 import { WorkScheduleDTO } from "@/lib/types/WorkScheduleDTO";
 import { format, parseISO } from "date-fns";
