@@ -27,7 +27,7 @@ export default function LayoutClientWrapper({
   return (
     <>
       <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 38, backgroundColor: "#1a3c6e", color: "#fff", display: "flex", alignItems: "center", paddingLeft: 20, fontSize: 13, fontWeight: 600, letterSpacing: "0.5px", zIndex: 1100, flexShrink: 0 }}>
-        Bayanihan GovSuite
+        ISOFT HRIS
       </div>
       <div style={{ display: "flex", minHeight: "100vh", marginTop: 38 }}>
       {/* Sidebar */}
@@ -52,8 +52,8 @@ export default function LayoutClientWrapper({
       </div>
     </div>
     <footer style={{ position: "fixed", bottom: 12, right: 16, fontSize: 9, color: "#9ca3af", textAlign: "right", lineHeight: 1.5, pointerEvents: "none", zIndex: 999 }}>
-      <div>Version 1.0.0 | {new Date().getFullYear()} &copy; Bayanihan GovSuite. All Rights Reserved.</div>
-      <div>A product of VERF IT Solutions. In partnership with ISOF and authorized distribution partners.</div>
+      <div>Version 1.0.0 | {new Date().getFullYear()} &copy; ISOFT HRIS. All Rights Reserved.</div>
+      <div></div>
     </footer>
     </>
   );

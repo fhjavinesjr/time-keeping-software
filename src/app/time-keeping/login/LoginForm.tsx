@@ -141,8 +141,8 @@ export default function LoginPage() {
         <div className={styles.borderLeft}></div>
         <div className={styles.inputs}>
           <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid #e8e8e8" }}>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1a3c6e", margin: 0, marginBottom: 4 }}>Bayanihan GovSuite</h1>
-            <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>Empowering Public Sector Workforce Management</p>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1a3c6e", margin: 0, marginBottom: 4 }}>ISOFT HRIS</h1>
+            <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>Empowering Public Service Through Digital Workforce Solutions</p>
           </div>
           <div className={styles.header}>
             <h2>Time Keeping</h2>

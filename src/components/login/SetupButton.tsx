@@ -17,9 +17,9 @@ const ButtonSetup: React.FC<ButtonSetupProps> = ({ buttonType, label }) => {
                 </div> 
             :   label === "Sign Up" ?
                 <div className={styles.buttonGroup}>
-                    <button type={buttonType} className={styles.signUpButton} >
+                    {/* <button type={buttonType} className={styles.signUpButton} >
                         Create Account
-                    </button>
+                    </button> */}
                 </div>
             :  
                 <a href="#" className={styles.forgotPassword} >
