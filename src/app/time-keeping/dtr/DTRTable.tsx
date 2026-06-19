@@ -7,6 +7,7 @@ import {
   isOvernightSegment,
   toWorkDateOnly,
 } from "@/lib/utils/dtrSegmentUtils";
+import { localStorageUtil } from "@/lib/utils/localStorageUtil";
 
 type DTRSegmentDTO = {
   dtrSegmentId: number;
@@ -105,6 +106,10 @@ export default function DTRTable({ records, scheduleMap = new Map(), overlayDeta
   const handleExpand = (idx: number) => {
     setExpanded(expanded === idx ? null : idx);
   };
+
+  const canAdd = localStorageUtil.canAdd("tk.dtr");
+  const canEdit = localStorageUtil.canEdit("tk.dtr");
+  const canDelete = localStorageUtil.canDelete("tk.dtr");
 
   return (
     <div className={styles.tableContainer}>
@@ -257,7 +262,7 @@ export default function DTRTable({ records, scheduleMap = new Map(), overlayDeta
                               <th>Late</th>
                               <th>Under</th>
                               <th>Over</th>
-                              {userRole === "1" && <th>Actions</th>}
+                              {(canEdit || canDelete) && <th>Actions</th>}
                             </tr>
                           </thead>
                           <tbody>
@@ -299,22 +304,24 @@ export default function DTRTable({ records, scheduleMap = new Map(), overlayDeta
                                     <td>{seg.lateMinutes}</td>
                                     <td>{seg.undertimeMinutes}</td>
                                     <td>{seg.overtimeMinutes}</td>
-                                    {userRole === "1" && (
-                                      <td className={styles.actionCell}>
+                                    <td className={styles.actionCell}>
+                                      {canEdit && (
                                         <button
                                           className={styles.editSegBtn}
                                           onClick={() => onEditSegment?.(rec, seg)}
                                         >
                                           Edit
                                         </button>
+                                      )}
+                                      {canDelete && (
                                         <button
                                           className={styles.deleteSegBtn}
                                           onClick={() => onDeleteSegment?.(rec, seg)}
                                         >
                                           Delete
                                         </button>
-                                      </td>
-                                    )}
+                                      )}
+                                    </td>
                                   </tr>
                                 );
                               })}

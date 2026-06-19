@@ -285,6 +285,9 @@ export default function DTRPage() {
   const [editSegmentState, setEditSegmentState] = useState<EditSegmentState | null>(null);
   const [isSavingSegment, setIsSavingSegment] = useState(false);
   const [dayOffDates, setDayOffDates] = useState<Set<string>>(new Set());
+  const canAdd = localStorageUtil.canAdd("tk.dtr");
+  const canEdit = localStorageUtil.canEdit("tk.dtr");
+  const canDelete = localStorageUtil.canDelete("tk.dtr");
 
   useEffect(() => {
     const storedEmployees = localStorageUtil.getEmployees();
@@ -306,16 +309,17 @@ export default function DTRPage() {
 
     setUserRole(role);
 
-    // Admin (role "1") manages other employees — leave selectedEmployee null
-    // so they must pick from the datalist. Non-admin sees their own record (read-only).
-    if (role !== "1" && empNo) {
+    // check permission
+    if (empNo && ((!canAdd && !canEdit) || (canAdd && !canEdit) || (!canAdd && canEdit))) {
       const storedList = localStorageUtil.getEmployees();
       const empFromList = storedList?.find(e => e.employeeNo === empNo) ?? null;
       if (empFromList) {
         setSelectedEmployee(empFromList);
+        setInputValue(`[${empFromList.employeeNo}] ${empFromList.fullName}`);
       } else if (fullname) {
         const emp = { employeeId: employeeId, employeeNo: empNo, fullName: fullname } as Employee;
         setSelectedEmployee(emp);
+        setInputValue(`[${empNo}] ${fullname}`);
       }
     }
   }, []);
@@ -1025,7 +1029,7 @@ export default function DTRPage() {
           <div className={modalStyles.modalHeader}>
             <h2 className={modalStyles.mainTitle}>
               Daily Time Record
-              {userRole === "1" && (
+              {canAdd && (
                 <Link
                   href="/time-keeping/dtr/manual-entry"
                   style={{
@@ -1055,30 +1059,26 @@ export default function DTRPage() {
                     <input
                       id="employee"
                       type="text"
-                      list={userRole === "1" ? "employee-list" : undefined}
+                      list={"employee-list"}
                       placeholder="Employee No / Lastname"
-                      value={
-                        userRole === "1"
-                          ? inputValue // ✅ Admin can type freely
-                          : selectedEmployee
-                          ? `[${selectedEmployee.employeeNo}] ${selectedEmployee.fullName}`
-                          : ""
-                      }
-                      readOnly={userRole !== "1"} // ✅ Non-admin can't edit
+                      value={inputValue}
+                      readOnly={(!canAdd && !canEdit) || (canAdd && !canEdit) || (!canAdd && canEdit)} // ✅ Non-admin can't edit
                       onChange={(e) => {
-                        if (userRole === "1") {
-                          setInputValue(e.target.value); // ✅ Track admin typing
-
-                          const selected = employees.find(
-                            (emp) =>
-                              `[${emp.employeeNo}] ${emp.fullName}`.toLowerCase() ===
-                              e.target.value.toLowerCase()
-                          );
-                          setSelectedEmployee(selected || null);
+                        if ((!canAdd && !canEdit) || (canAdd && !canEdit) || (!canAdd && canEdit)) return;
+                        setInputValue(e.target.value);
+                        const match = employees.find(
+                          (emp) =>
+                            `[${emp.employeeNo}] ${emp.fullName}`.toLowerCase() ===
+                            e.target.value.toLowerCase()
+                        );
+                        if (match) {
+                          setSelectedEmployee(match);
+                        } else {
+                          setSelectedEmployee(null);
                         }
                       }}
                     />
-                    {userRole === "1" && (
+                    {(
                       <datalist id="employee-list">
                         {employees.map((emp) => (
                           <option

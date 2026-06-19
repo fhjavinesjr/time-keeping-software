@@ -4,4 +4,8 @@ export type Employee = {
   employeeNo: string;
   fullName: string;
   role: string;
+  biometricNo: string;
+
+  isSearched: boolean;
+  isCleared: boolean;
 };

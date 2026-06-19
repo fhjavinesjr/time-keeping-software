@@ -104,6 +104,9 @@ export default function WorkSchedule() {
   const [employeeInputValue, setEmployeeInputValue] = useState<string>("");
   const [timeShift, setTimeShift] = useState<TimeShift[]>([]);
   const [currentCalendarDate, setCurrentCalendarDate] = useState<Date>(new Date());
+  const canAdd = localStorageUtil.canAdd("tk.workSchedule");
+  const canEdit = localStorageUtil.canEdit("tk.workSchedule");
+  const canDelete = localStorageUtil.canDelete("tk.workSchedule");
 
   // Fetch Time Shifts (page load)
   const fetchTimeShifts = useCallback(async () => {
@@ -214,25 +217,29 @@ export default function WorkSchedule() {
 
   // On mount: load role and employee list
   useEffect(() => {
+    const stored = localStorageUtil.getEmployees();
+    if (stored && stored.length > 0) {
+      setEmployees(stored);
+    }
     const role = localStorageUtil.getEmployeeRole();
-    const employeeNo = localStorageUtil.getEmployeeNo();
+    const empNo = localStorageUtil.getEmployeeNo();
     const employeeId = localStorageUtil.getEmployeeId();
+    const fullname = localStorageUtil.getEmployeeFullname();
 
     setUserRole(role);
 
     const storedEmployees = localStorageUtil.getEmployees();
     setEmployees(storedEmployees);
 
-    const emp = storedEmployees.find((e) => e.employeeNo === employeeNo);
-    if (emp) {
-      setSelectedEmployee(emp);
-      setEmployeeInputValue(`[${emp.employeeNo}] ${emp.fullName}`);
-    } else if (employeeNo && role !== "1") {
-      // Fallback when employees list is empty: use individual localStorage keys
-      const fullname = localStorageUtil.getEmployeeFullname();
-      if (fullname) {
-        setSelectedEmployee({ employeeId: employeeId ?? "", employeeNo, fullName: fullname, role: role ?? "" } as Employee);
-        setEmployeeInputValue(`[${employeeNo}] ${fullname}`);
+    if (empNo && ((!canAdd && !canEdit) || (canAdd && !canEdit) || (!canAdd && canEdit))) {
+      const empFromList = stored?.find(e => e.employeeNo === empNo) ?? null;
+      if (empFromList) {
+        setSelectedEmployee(empFromList);
+        setEmployeeInputValue(`[${empFromList.employeeNo}] ${empFromList.fullName}`);
+      } else if (fullname) {
+        const own: Employee = { employeeId: String(employeeId ?? ""), employeeNo: empNo, fullName: fullname, role: role ?? "", biometricNo: "", isSearched: false, isCleared: false };
+        setSelectedEmployee(own);
+        setEmployeeInputValue(`[${empNo}] ${fullname}`);
       }
     }
 
@@ -646,7 +653,7 @@ export default function WorkSchedule() {
         list: "shift-list",
       },
       showCancelButton: true,
-      showDenyButton: true,
+      showDenyButton: canDelete ? true : false,
       confirmButtonText: "Update",
       denyButtonText: "Delete",
       cancelButtonText: "Cancel",
@@ -862,63 +869,56 @@ export default function WorkSchedule() {
             {/* ✅ Employee Name field */}
             <div className={styles.formGroup}>
               <label htmlFor="employee">Employee Name&nbsp;</label>
-              {userRole === "1" ? (
-                <>
-                  <input
+              <input
                     id="employee"
                     type="text"
-                    list="employee-list"
-                    placeholder="Employee No / Lastname"
+                    list={"employee-list"}
+                    placeholder="Employee No / Last Name"
                     value={employeeInputValue}
+                    readOnly={(!canAdd && !canEdit) || (canAdd && !canEdit) || (!canAdd && canEdit)}
                     onChange={(e) => {
-                      const inputVal = e.target.value;
-                      setEmployeeInputValue(inputVal);
-
-                      const selected = employees.find(
+                      if ((!canAdd && !canEdit) || (canAdd && !canEdit) || (!canAdd && canEdit)) return;
+                      setEmployeeInputValue(e.target.value);
+                      const match = employees.find(
                         (emp) =>
                           `[${emp.employeeNo}] ${emp.fullName}`.toLowerCase() ===
-                          inputVal.toLowerCase()
+                          e.target.value.toLowerCase()
                       );
-                      setSelectedEmployee(selected || null);
+                      if (match) {
+                        setSelectedEmployee(match);
+                      } else {
+                        setSelectedEmployee(null);
+                      }
                     }}
+                    className={styles.searchInput}
+                    style={{ width: "35%" }}
                   />
-
-                  <datalist id="employee-list">
-                    {employees.map((emp) => (
-                      <option
-                        key={emp.employeeNo}
-                        value={`[${emp.employeeNo}] ${emp.fullName}`}
-                      />
-                    ))}
-                  </datalist>
-
-                  {/* Shift list for SweetAlert autocomplete */}
-                  <datalist id="shift-list">
-                    {timeShift.map((shift) => (
-                      <option key={shift.tsCode} value={shift.tsCode}>
-                        {to12HourFormat(shift.timeIn) + "-"}
-                        {shift.breakOut != null
-                          ? to12HourFormat(shift.breakOut) + "/"
-                          : ""}
-                        {shift.breakIn != null
-                          ? to12HourFormat(shift.breakIn) + "-"
-                          : ""}
-                        {to12HourFormat(shift.timeOut)}
-                      </option>
-                    ))}
-                  </datalist>
-                </>
-              ) : (
-                <input
-                  type="text"
-                  readOnly
-                  value={
-                    selectedEmployee
-                      ? `[${selectedEmployee.employeeNo}] ${selectedEmployee.fullName}`
-                      : ""
-                  }
-                />
-              )}
+                  {(
+                    <datalist id="employee-list">
+                      {employees.map((emp) => (
+                        <option
+                          key={emp.employeeNo}
+                          value={`[${emp.employeeNo}] ${emp.fullName}`}
+                        />
+                      ))}
+                    </datalist>
+                  )}
+                  {(
+                    <datalist id="shift-list">
+                      {timeShift.map((shift) => (
+                        <option key={shift.tsCode} value={shift.tsCode}>
+                          {to12HourFormat(shift.timeIn) + "-"}
+                          {shift.breakOut != null
+                            ? to12HourFormat(shift.breakOut) + "/"
+                            : ""}
+                          {shift.breakIn != null
+                            ? to12HourFormat(shift.breakIn) + "-"
+                            : ""}
+                          {to12HourFormat(shift.timeOut)}
+                        </option>
+                      ))}
+                    </datalist>
+                  )}
             </div>
             {/* 🔻 Time Shift Legend with Tooltip */}
             <div className={styles.legend}>
@@ -982,7 +982,7 @@ export default function WorkSchedule() {
                 </div>
               </div>
             </div>
-            {userRole === "1" && (
+            {canAdd && (
               <div className={styles.autoFillContainer}>
                 <button
                   className={styles.autoFillButton}
@@ -1002,8 +1002,8 @@ export default function WorkSchedule() {
                 right: "",
               }}
               events={[...workScheduleEvents, ...holidayEvents]}
-              dateClick={userRole === "1" ? handleDateClick : undefined}
-              eventClick={userRole === "1" ? handleEventClick : undefined} // ✅ Add this line
+              dateClick={canAdd && canEdit ? handleDateClick : undefined}
+              eventClick={canAdd && canEdit ? handleEventClick : undefined} // ✅ Add this line
               editable={false}
               selectable={true}
               height="auto"

@@ -6,6 +6,7 @@ import styles from "@/styles/DashboardSidebar.module.scss";
 import { usePathname } from "next/navigation";
 import { authLogout } from "@/lib/utils/authLogout";
 import { useRouter } from "next/navigation";
+import { localStorageUtil } from "@/lib/utils/localStorageUtil";
 
 const menuItems = [
   {
@@ -14,6 +15,7 @@ const menuItems = [
     label: "Daily Time Record",
     goto: "/time-keeping/dtr",
     isActive: false,
+    permKey: "tk.dtr",
   },
   {
     id: 2,
@@ -21,6 +23,7 @@ const menuItems = [
     label: "Work Schedule",
     goto: "/time-keeping/workschedule",
     isActive: false,
+    permKey: "tk.workSchedule",
   },
 ];
 
@@ -44,6 +47,8 @@ export default function Sidebar() {
   const pathname = usePathname(); // Use usePathname for the current route
   const router = useRouter(); // Use useRouter for navigation
 
+  const visibleMenuItems = menuItems.filter(item => localStorageUtil.canAccess(item.permKey));
+
   return (
     <nav
       className={styles.Sidebar}
@@ -58,7 +63,7 @@ export default function Sidebar() {
       <div className={styles.menuSection}>
         <h2 className={styles.menuHeader}>MENU</h2>
         <div role="menu">
-          {menuItems.map((item, index) => (
+          {visibleMenuItems.map((item, index) => (
             <MenuItem
               key={index}
               icon={item.icon}
