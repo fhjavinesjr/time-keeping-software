@@ -40,8 +40,10 @@ const toApiFormat = (isoDate: string): string => {
 };
 
 // Standard PH government schedule in minutes from midnight
-const SCHEDULE_IN_MIN  = 8 * 60;   // 08:00
-const SCHEDULE_OUT_MIN = 17 * 60;  // 17:00
+const SCHEDULE_IN_MIN        = 8 * 60;   // 08:00
+const SCHEDULE_BREAK_OUT_MIN = 12 * 60;  // 12:00
+const SCHEDULE_BREAK_IN_MIN  = 13 * 60;  // 13:00
+const SCHEDULE_OUT_MIN       = 17 * 60;  // 17:00
 
 const parseTimeToMin = (t: string): number => {
   if (!t) return 0;
@@ -58,16 +60,35 @@ const computeMinutes = (
   breakIn: string,
   timeOut: string
 ) => {
-  const inMin  = parseTimeToMin(timeIn);
+  const inMin = parseTimeToMin(timeIn);
   const outMin = parseTimeToMin(timeOut);
-  let breakMins = 0;
-  if (breakOut && breakIn) {
-    breakMins = Math.max(0, parseTimeToMin(breakIn) - parseTimeToMin(breakOut));
-  }
-  const workMinutes      = Math.max(0, outMin - inMin - breakMins);
-  const lateMinutes      = Math.max(0, inMin  - SCHEDULE_IN_MIN);
-  const undertimeMinutes = outMin < SCHEDULE_OUT_MIN ? Math.max(0, SCHEDULE_OUT_MIN - outMin) : 0;
-  const overtimeMinutes  = outMin > SCHEDULE_OUT_MIN ? Math.max(0, outMin - SCHEDULE_OUT_MIN) : 0;
+  const breakOutMin = breakOut ? parseTimeToMin(breakOut) : null;
+  const breakInMin = breakIn ? parseTimeToMin(breakIn) : null;
+
+  // Productive work minutes:
+  // with break punches: (timeIn -> breakOut) + (breakIn -> timeOut)
+  // without complete break punches: fallback to timeIn -> timeOut
+  const workMinutes =
+    breakOutMin !== null && breakInMin !== null
+      ? Math.max(0, breakOutMin - inMin) + Math.max(0, outMin - breakInMin)
+      : Math.max(0, outMin - inMin);
+
+  // Agency-aligned PH Gov / CSC-style UI separation:
+  // LATE  = late time-in + late break-in
+  // UNDER = early break-out + early final time-out
+  // Printed CSC DTR undertime = LATE + UNDER
+  const lateTimeIn = Math.max(0, inMin - SCHEDULE_IN_MIN);
+  const lateBreakIn =
+    breakInMin !== null ? Math.max(0, breakInMin - SCHEDULE_BREAK_IN_MIN) : 0;
+
+  const earlyBreakOut =
+    breakOutMin !== null ? Math.max(0, SCHEDULE_BREAK_OUT_MIN - breakOutMin) : 0;
+  const earlyTimeOut = Math.max(0, SCHEDULE_OUT_MIN - outMin);
+
+  const lateMinutes = lateTimeIn + lateBreakIn;
+  const undertimeMinutes = earlyBreakOut + earlyTimeOut;
+  const overtimeMinutes = Math.max(0, outMin - SCHEDULE_OUT_MIN);
+
   return { workMinutes, lateMinutes, undertimeMinutes, overtimeMinutes };
 };
 
@@ -152,6 +173,21 @@ export default function ManualDTREntryPage() {
     if (parseTimeToMin(timeIn) >= parseTimeToMin(timeOut)) {
       Swal.fire("Warning", "Time Out must be after Time In.", "warning");
       return;
+    }
+    if ((breakOut && !breakIn) || (!breakOut && breakIn)) {
+      Swal.fire("Warning", "Please provide both Break Out and Break In, or leave both blank.", "warning");
+      return;
+    }
+    if (breakOut && breakIn) {
+      const inMin = parseTimeToMin(timeIn);
+      const breakOutMin = parseTimeToMin(breakOut);
+      const breakInMin = parseTimeToMin(breakIn);
+      const outMin = parseTimeToMin(timeOut);
+
+      if (!(inMin <= breakOutMin && breakOutMin <= breakInMin && breakInMin <= outMin)) {
+        Swal.fire("Warning", "Time order must be Time In → Break Out → Break In → Time Out.", "warning");
+        return;
+      }
     }
 
     const dates = getDatesInRange(dateFrom, dateTo);

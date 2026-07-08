@@ -65,7 +65,7 @@ export default function LayoutClientWrapper({
             );
 
             if (matched) {
-              resolvedEmployeeId = Number(matched.employeeId);
+              resolvedEmployeeId = String(matched.employeeId);
               localStorageUtil.setEmployeeId(resolvedEmployeeId);
               if (!fullName && matched.fullName) {
                 localStorageUtil.setEmployeeFullname(matched.fullName);

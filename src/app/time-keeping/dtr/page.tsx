@@ -269,6 +269,12 @@ type EditSegmentState = {
 
 const toTimeStr = (t: string): string => (t.length === 5 ? `${t}:00` : t);
 
+const toIsoDateParam = (customDate: string): string => {
+  const [datePart] = customDate.split(" ");
+  const [mm, dd, yyyy] = datePart.split("-");
+  return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+};
+
 export default function DTRPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -884,6 +890,8 @@ export default function DTRPage() {
     const scheduled = scheduleMap.get(dateKey);
     const SCHED_IN  = scheduled ? timeToMinutes(scheduled.timeIn)  : 8 * 60;
     const SCHED_OUT = scheduled ? timeToMinutes(scheduled.timeOut) : 17 * 60;
+    const SCHED_BREAK_OUT = scheduled?.breakOut ? timeToMinutes(scheduled.breakOut) : null;
+    const SCHED_BREAK_IN = scheduled?.breakIn ? timeToMinutes(scheduled.breakIn) : null;
 
     const inMin = timeToMinutes(timeIn);
 
@@ -917,10 +925,27 @@ export default function DTRPage() {
         lastMin = timeToMinutes(breakOut!);
       }
 
-      workMinutes      = Math.max(0, lastMin - inMin - breakMins);
-      lateMinutes      = Math.max(0, inMin - SCHED_IN);
-      undertimeMinutes = lastMin < SCHED_OUT ? Math.max(0, SCHED_OUT - lastMin) : 0;
-      overtimeMinutes  = lastMin > SCHED_OUT ? Math.max(0, lastMin - SCHED_OUT) : 0;
+      workMinutes = Math.max(0, lastMin - inMin - breakMins);
+
+      // Agency/CSC-style UI separation:
+      // LATE  = late TIME_IN + late BREAK_IN
+      // UNDER = early BREAK_OUT + early TIME_OUT
+      // The printed CSC DTR undertime column should combine LATE + UNDER.
+      const lateTimeIn = Math.max(0, inMin - SCHED_IN);
+      const lateBreakIn =
+        breakIn && SCHED_BREAK_IN !== null
+          ? Math.max(0, timeToMinutes(breakIn) - SCHED_BREAK_IN)
+          : 0;
+      const earlyBreakOut =
+        breakOut && SCHED_BREAK_OUT !== null
+          ? Math.max(0, SCHED_BREAK_OUT - timeToMinutes(breakOut))
+          : 0;
+      const earlyTimeOut =
+        timeOut && lastMin < SCHED_OUT ? Math.max(0, SCHED_OUT - lastMin) : 0;
+
+      lateMinutes = lateTimeIn + lateBreakIn;
+      undertimeMinutes = earlyBreakOut + earlyTimeOut;
+      overtimeMinutes = lastMin > SCHED_OUT ? Math.max(0, lastMin - SCHED_OUT) : 0;
     }
 
     const updatedSegment: DTRSegmentDTO = {
@@ -1022,6 +1047,46 @@ export default function DTRPage() {
     }
   };
 
+  const handlePrintDtr = async () => {
+    if (!selectedEmployee || !fromDate || !toDate) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Missing Input",
+        text: "Select employee and date range first before printing DTR.",
+      });
+      return;
+    }
+
+    try {
+      const fromIso = toIsoDateParam(fromDate);
+      const toIso = toIsoDateParam(toDate);
+      const url = `${API_BASE_URL_TIMEKEEPING}/api/dtr-daily/report?employeeId=${encodeURIComponent(
+        selectedEmployee.employeeId
+      )}&fromDate=${encodeURIComponent(fromIso)}&toDate=${encodeURIComponent(toIso)}`;
+
+      const response = await fetchWithAuth(url);
+      if (!response.ok) {
+        throw new Error(`Failed to generate DTR report (${response.status})`);
+      }
+
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `DTR_${selectedEmployee.employeeNo}_${fromIso}_${toIso}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      await Swal.fire({
+        icon: "error",
+        title: "Print Failed",
+        text: String(error),
+      });
+    }
+  };
+
   return (
     <Main>
       <div className={modalStyles.Modal}>
@@ -1117,6 +1182,13 @@ export default function DTRPage() {
                   <div className={styles.actions}>
                     <button className={styles.searchButton} onClick={fetchDTR}>
                       Search
+                    </button>
+                    <button
+                      className={styles.searchButton}
+                      onClick={handlePrintDtr}
+                      style={{ marginLeft: "0.5rem", background: "#065f46" }}
+                    >
+                      Print DTR
                     </button>
                   </div>
                 </div>

@@ -17,7 +17,7 @@ export default function WelcomePage() {
         <section className={styles.page}>
             <div className={styles.panel}>
                 <p className={styles.kicker}>Welcome back.</p>
-                <h1 className={styles.title}>Welcome to the HRIS</h1>
+                <h1 className={styles.title}>Welcome to the ISOFT HRIS</h1>
                 <p className={styles.subtitle}>Hi {firstName},</p>
                 <p className={styles.subtitle}>You are successfully logged in.</p>
 
