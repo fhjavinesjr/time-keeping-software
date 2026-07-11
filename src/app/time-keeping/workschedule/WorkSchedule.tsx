@@ -72,6 +72,19 @@ type TimeShift = {
   tsName?: string; // Optional, for tooltip
 };
 
+type Area = {
+  areasId: number;
+  areasName: string;
+  areasDescription?: string;
+};
+
+type BusinessUnit = {
+  businessUnitsId: number;
+  businessUnitsName: string;
+  businessUnitsCode: string;
+  areasId: number;
+};
+
 const getHolidayDisplayDate = (holiday: HolidayDTO) => {
   const observed = holiday.observedDate?.trim();
   if (observed && observed !== holiday.holidayDate) {
@@ -107,6 +120,93 @@ export default function WorkSchedule() {
   const canAdd = localStorageUtil.canAdd("tk.workSchedule");
   const canEdit = localStorageUtil.canEdit("tk.workSchedule");
   const canDelete = localStorageUtil.canDelete("tk.workSchedule");
+  const [activeTab, setActiveTab] = useState<"calendar" | "report">("calendar");
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([]);
+  const [reportAreaId, setReportAreaId] = useState<number | "">("");
+  const [reportBusinessUnitId, setReportBusinessUnitId] = useState<number | "">("");
+  const [reportFromDate, setReportFromDate] = useState("");
+  const [reportToDate, setReportToDate] = useState("");
+  const [reportPreparedBy, setReportPreparedBy] = useState("");
+  const [reportPreparedByPos, setReportPreparedByPos] = useState("");
+  const [reportPreparedByEmployee, setReportPreparedByEmployee] = useState<Employee | null>(null);
+  const [reportApprovedBy, setReportApprovedBy] = useState("");
+  const [reportApprovedByPos, setReportApprovedByPos] = useState("");
+  const [reportApprovedByEmployee, setReportApprovedByEmployee] = useState<Employee | null>(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+
+  const filteredReportBusinessUnits = businessUnits.filter(
+    (unit) => reportAreaId !== "" && unit.areasId === reportAreaId
+  );
+
+  const toEmployeeOption = (employee: Employee) => `[${employee.employeeNo}] ${employee.fullName}`;
+
+  const findEmployeeFromOption = (value: string) =>
+    employees.find(
+      (employee) => toEmployeeOption(employee).toLowerCase() === value.toLowerCase()
+    ) ?? null;
+
+  const fetchCurrentAppointmentPosition = useCallback(async (employeeId: string) => {
+    if (!employeeId) return "";
+
+    try {
+      const response = await fetchWithAuth(
+        `${API_BASE_URL_TIMEKEEPING}/api/work-schedule/signatory-position?employeeId=${encodeURIComponent(employeeId)}`
+      );
+
+      if (!response.ok) {
+        return "";
+      }
+
+      const data: { position?: string | null } = await response.json();
+      return data.position ?? "";
+    } catch (error) {
+      console.error("Failed to fetch signatory position:", error);
+      return "";
+    }
+  }, []);
+
+  const handlePreparedByChange = async (value: string) => {
+    setReportPreparedBy(value);
+
+    const matchedEmployee = findEmployeeFromOption(value);
+    setReportPreparedByEmployee(matchedEmployee);
+
+    if (!matchedEmployee) {
+      setReportPreparedByPos("");
+      return;
+    }
+
+    const position = await fetchCurrentAppointmentPosition(String(matchedEmployee.employeeId));
+    setReportPreparedByPos(position);
+  };
+
+  const handleApprovedByChange = async (value: string) => {
+    setReportApprovedBy(value);
+
+    const matchedEmployee = findEmployeeFromOption(value);
+    setReportApprovedByEmployee(matchedEmployee);
+
+    if (!matchedEmployee) {
+      setReportApprovedByPos("");
+      return;
+    }
+
+    const position = await fetchCurrentAppointmentPosition(String(matchedEmployee.employeeId));
+    setReportApprovedByPos(position);
+  };
+
+  useEffect(() => {
+    fetchWithAuth(`${API_BASE_URL_ADMINISTRATIVE}/api/areas/get-all`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(res.statusText)))
+      .then((data: Area[]) => setAreas(data || []))
+      .catch(() => setAreas([]));
+
+    fetchWithAuth(`${API_BASE_URL_ADMINISTRATIVE}/api/businessUnits/get-all`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(res.statusText)))
+      .then((data: BusinessUnit[]) => setBusinessUnits(data || []))
+      .catch(() => setBusinessUnits([]));
+  }, []);
 
   // Fetch Time Shifts (page load)
   const fetchTimeShifts = useCallback(async () => {
@@ -857,6 +957,62 @@ export default function WorkSchedule() {
     }
   };
 
+  const handleGenerateWorkScheduleReport = async () => {
+    if (reportAreaId === "") {
+      await Swal.fire({ icon: "warning", title: "Missing Area", text: "Please select an area first." });
+      return;
+    }
+    if (!reportFromDate || !reportToDate) {
+      await Swal.fire({ icon: "warning", title: "Missing Date Range", text: "Please select Date From and Date To." });
+      return;
+    }
+    if (new Date(reportFromDate) > new Date(reportToDate)) {
+      await Swal.fire({ icon: "warning", title: "Invalid Date Range", text: "Date From cannot be after Date To." });
+      return;
+    }
+
+    setIsGeneratingReport(true);
+    try {
+      const params = new URLSearchParams({
+        areaId: String(reportAreaId),
+        fromDate: reportFromDate,
+        toDate: reportToDate,
+        preparedBy: (reportPreparedByEmployee?.fullName ?? reportPreparedBy).trim(),
+        preparedByPos: reportPreparedByPos.trim(),
+        approvedBy: (reportApprovedByEmployee?.fullName ?? reportApprovedBy).trim(),
+        approvedByPos: reportApprovedByPos.trim(),
+      });
+      if (reportBusinessUnitId !== "") {
+        params.set("businessUnitId", String(reportBusinessUnitId));
+      }
+
+      const response = await fetchWithAuth(
+        `${API_BASE_URL_TIMEKEEPING}/api/work-schedule/report?${params.toString()}`
+      );
+      if (!response.ok) {
+        throw new Error(`Failed to generate Work Schedule report (${response.status})`);
+      }
+
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `WorkSchedule_${reportFromDate}_${reportToDate}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      await Swal.fire({
+        icon: "error",
+        title: "Report Failed",
+        text: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
   return (
     <div id="workScheduleModal" className={modalStyles.Modal}>
       <div className={modalStyles.modalContent}>
@@ -864,7 +1020,40 @@ export default function WorkSchedule() {
           <h2 className={modalStyles.mainTitle}>Work Schedule</h2>
         </div>
         <div className={modalStyles.modalBody}>
-          {/* 📅 Calendar */}
+          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", borderBottom: "1px solid #dbe3ef" }}>
+            <button
+              type="button"
+              onClick={() => setActiveTab("calendar")}
+              style={{
+                padding: "0.65rem 1rem",
+                border: "none",
+                borderBottom: activeTab === "calendar" ? "3px solid #2563eb" : "3px solid transparent",
+                background: "transparent",
+                color: activeTab === "calendar" ? "#1d4ed8" : "#475569",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Work Schedule
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("report")}
+              style={{
+                padding: "0.65rem 1rem",
+                border: "none",
+                borderBottom: activeTab === "report" ? "3px solid #2563eb" : "3px solid transparent",
+                background: "transparent",
+                color: activeTab === "report" ? "#1d4ed8" : "#475569",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Report
+            </button>
+          </div>
+
+          {activeTab === "calendar" ? (
           <div className={styles.WorkSchedule}>
             {/* ✅ Employee Name field */}
             <div className={styles.formGroup}>
@@ -1080,6 +1269,119 @@ export default function WorkSchedule() {
               }}
             />
           </div>
+          ) : (
+            <div className={styles.WorkSchedule}>
+              <div style={{ maxWidth: 720, display: "grid", gap: "1rem" }}>
+                <div style={{ padding: "1rem", border: "1px solid #dbe3ef", borderRadius: "0.75rem", background: "#f8fafc" }}>
+                  <h3 style={{ marginTop: 0, marginBottom: "0.75rem", color: "#1e3a8a" }}>Work Schedule Report</h3>
+                  <p style={{ marginTop: 0, color: "#64748b" }}>Generate work schedule report by Area, Business Unit, and date range.</p>
+
+                  <datalist id="report-employee-list">
+                    {employees.map((employee) => (
+                      <option key={employee.employeeNo} value={toEmployeeOption(employee)} />
+                    ))}
+                  </datalist>
+
+                  <div style={{ display: "grid", gap: "0.75rem" }}>
+                    <div className={styles.formGroup}>
+                      <label>Area</label>
+                      <select
+                        value={reportAreaId}
+                        onChange={(e) => {
+                          setReportAreaId(e.target.value ? Number(e.target.value) : "");
+                          setReportBusinessUnitId("");
+                        }}
+                        className={styles.searchInput}
+                        style={{ width: "100%" }}
+                      >
+                        <option value="">Select Area</option>
+                        {areas.map((area) => (
+                          <option key={area.areasId} value={area.areasId}>
+                            {area.areasName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className={styles.formGroup}>
+                      <label>Business Unit</label>
+                      <select
+                        value={reportBusinessUnitId}
+                        onChange={(e) => setReportBusinessUnitId(e.target.value ? Number(e.target.value) : "")}
+                        disabled={reportAreaId === ""}
+                        className={styles.searchInput}
+                        style={{ width: "100%" }}
+                      >
+                        <option value="">All Business Units</option>
+                        {filteredReportBusinessUnits.map((unit) => (
+                          <option key={unit.businessUnitsId} value={unit.businessUnitsId}>
+                            {unit.businessUnitsName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                      <div className={styles.formGroup}>
+                        <label>Date From</label>
+                        <input
+                          type="date"
+                          value={reportFromDate}
+                          onChange={(e) => setReportFromDate(e.target.value)}
+                          className={styles.searchInput}
+                        />
+                      </div>
+                      <div className={styles.formGroup}>
+                        <label>Date To</label>
+                        <input
+                          type="date"
+                          value={reportToDate}
+                          onChange={(e) => setReportToDate(e.target.value)}
+                          className={styles.searchInput}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                      <div className={styles.formGroup}>
+                        <label>Prepared By</label>
+                        <input
+                          type="text"
+                          list="report-employee-list"
+                          value={reportPreparedBy}
+                          onChange={(e) => { void handlePreparedByChange(e.target.value); }}
+                          placeholder="Employee No / Last Name"
+                          className={styles.searchInput}
+                        />
+                      </div>
+                      <div className={styles.formGroup}>
+                        <label>Approved By</label>
+                        <input
+                          type="text"
+                          list="report-employee-list"
+                          value={reportApprovedBy}
+                          onChange={(e) => { void handleApprovedByChange(e.target.value); }}
+                          placeholder="Employee No / Last Name"
+                          className={styles.searchInput}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <button
+                        type="button"
+                        onClick={handleGenerateWorkScheduleReport}
+                        disabled={isGeneratingReport}
+                        className={styles.autoFillButton}
+                      >
+                        {isGeneratingReport ? "Generating..." : "Generate Report"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

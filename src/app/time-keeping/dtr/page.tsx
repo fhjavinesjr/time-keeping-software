@@ -286,7 +286,7 @@ export default function DTRPage() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [holidays, setHolidays] = useState<HolidayDTO[]>([]);
-  const [scheduleMap, setScheduleMap] = useState<Map<string, ScheduledTimes>>(new Map());
+  const [scheduleMap, setScheduleMap] = useState<Map<string, ScheduledTimes[]>>(new Map());
   const [overlayDetailMap, setOverlayDetailMap] = useState<Map<string, OverlayDetail>>(new Map());
   const [editSegmentState, setEditSegmentState] = useState<EditSegmentState | null>(null);
   const [isSavingSegment, setIsSavingSegment] = useState(false);
@@ -567,7 +567,7 @@ export default function DTRPage() {
   const overlayTimeCorrections = (
     rows: DTRDailyDTO[],
     tcDetailMap: Map<string, OverlayDetail>,
-    scheduledTimesMap: Map<string, ScheduledTimes>
+    scheduledTimesMap: Map<string, ScheduledTimes[]>
   ): DTRDailyDTO[] => {
     if (tcDetailMap.size === 0) return rows;
     return rows.map((rec) => {
@@ -578,7 +578,8 @@ export default function DTRPage() {
       if (!detail || detail.kind !== "TIME_CORRECTED") return rec;
 
       // Compute work/late/undertime from corrected times vs scheduled shift
-      const scheduled = scheduledTimesMap.get(dateKey);
+      const schedules = scheduledTimesMap.get(dateKey) ?? [];
+      const scheduled = schedules[0];
       let totalWorkMinutes = 0;
       let totalLateMinutes = 0;
       let totalUndertimeMinutes = 0;
@@ -689,7 +690,7 @@ export default function DTRPage() {
             fetchTimeShifts(),
           ]);
           const dayOffSet = new Set<string>();
-          const scheduledTimesMap204 = new Map<string, ScheduledTimes>();
+          const scheduledTimesMap204 = new Map<string, ScheduledTimes[]>();
           if (wsRes.status !== 204 && wsRes.ok) {
             const wsJson: WorkScheduleEntryDTO[] = await wsRes.json();
             wsJson.forEach((ws) => {
@@ -698,7 +699,10 @@ export default function DTRPage() {
                 dayOffSet.add(key);
               } else if (ws.tsCode) {
                 const shift = tsMap.get(ws.tsCode);
-                if (shift) scheduledTimesMap204.set(key, shift);
+                if (shift) {
+                  const current = scheduledTimesMap204.get(key) ?? [];
+                  scheduledTimesMap204.set(key, [...current, shift]);
+                }
               }
             });
           }
@@ -765,7 +769,7 @@ export default function DTRPage() {
           fetchTimeShifts(),
         ]);
         const dayOffSet = new Set<string>();
-        const scheduledTimesMap = new Map<string, ScheduledTimes>();
+        const scheduledTimesMap = new Map<string, ScheduledTimes[]>();
         if (wsRes.status !== 204 && wsRes.ok) {
           const wsJson: WorkScheduleEntryDTO[] = await wsRes.json();
           wsJson.forEach((ws) => {
@@ -774,7 +778,10 @@ export default function DTRPage() {
               dayOffSet.add(key);
             } else if (ws.tsCode) {
               const shift = tsMap.get(ws.tsCode);
-              if (shift) scheduledTimesMap.set(key, shift);
+              if (shift) {
+                const current = scheduledTimesMap.get(key) ?? [];
+                scheduledTimesMap.set(key, [...current, shift]);
+              }
             }
           });
         }
@@ -887,7 +894,12 @@ export default function DTRPage() {
     }
 
     const dateKey = toIsoDateKey(record.workDate);
-    const scheduled = scheduleMap.get(dateKey);
+    const schedules = scheduleMap.get(dateKey) ?? [];
+    const scheduled =
+      schedules.find((shift) =>
+        shift.timeIn?.substring(0, 5) === timeIn &&
+        (!timeOut || shift.timeOut?.substring(0, 5) === timeOut)
+      ) ?? schedules[Math.max(0, (segment.segmentNo ?? 1) - 1)];
     const SCHED_IN  = scheduled ? timeToMinutes(scheduled.timeIn)  : 8 * 60;
     const SCHED_OUT = scheduled ? timeToMinutes(scheduled.timeOut) : 17 * 60;
     const SCHED_BREAK_OUT = scheduled?.breakOut ? timeToMinutes(scheduled.breakOut) : null;

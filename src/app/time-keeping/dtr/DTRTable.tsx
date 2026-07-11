@@ -59,7 +59,7 @@ type OverlayDetail =
 
 type Props = {
   records: DTRDailyDTO[];
-  scheduleMap?: Map<string, ScheduledTimes>;
+  scheduleMap?: Map<string, ScheduledTimes[]>;
   overlayDetailMap?: Map<string, OverlayDetail>;
   userRole?: string | null;
   onEditSegment?: (record: DTRDailyDTO, segment: DTRSegmentDTO) => void;
@@ -144,7 +144,7 @@ export default function DTRTable({ records, scheduleMap = new Map(), overlayDeta
           </thead>
           <tbody>
             {records.map((rec, idx) => {
-              const scheduled = scheduleMap.get(toIsoKey(rec.workDate));
+              const schedules = scheduleMap.get(toIsoKey(rec.workDate)) ?? [];
               const overlayDetail = overlayDetailMap.get(toIsoKey(rec.workDate));
               return (
               <React.Fragment key={rec.dtrDailyId}>
@@ -220,7 +220,7 @@ export default function DTRTable({ records, scheduleMap = new Map(), overlayDeta
                     )}
                   </td>
                   <td>
-                    {scheduled ? (
+                    {schedules.length > 0 ? (
                       <button
                         className={styles.scheduleToggleButton}
                         aria-label={scheduleExpanded === idx ? "Hide schedule" : "Show schedule"}
@@ -395,7 +395,7 @@ export default function DTRTable({ records, scheduleMap = new Map(), overlayDeta
                     </td>
                   </tr>
                 )}
-                {scheduleExpanded === idx && scheduled && (
+                {scheduleExpanded === idx && schedules.length > 0 && (
                   <tr>
                     <td className={styles.scheduleCell} colSpan={8}>
                       <div className={styles.schedulePanel}>
@@ -410,13 +410,15 @@ export default function DTRTable({ records, scheduleMap = new Map(), overlayDeta
                             </tr>
                           </thead>
                           <tbody>
-                            <tr>
-                              <td>{scheduled.tsName} ({scheduled.tsCode})</td>
-                              <td>{formatTime(scheduled.timeIn)}</td>
-                              <td>{scheduled.breakOut ? formatTime(scheduled.breakOut) : "\u2014"}</td>
-                              <td>{scheduled.breakIn ? formatTime(scheduled.breakIn) : "\u2014"}</td>
-                              <td>{formatTime(scheduled.timeOut)}</td>
-                            </tr>
+                            {schedules.map((scheduled, scheduleIndex) => (
+                              <tr key={`${scheduled.tsCode}-${scheduleIndex}`}>
+                                <td>{scheduled.tsName} ({scheduled.tsCode})</td>
+                                <td>{formatTime(scheduled.timeIn)}</td>
+                                <td>{scheduled.breakOut ? formatTime(scheduled.breakOut) : "\u2014"}</td>
+                                <td>{scheduled.breakIn ? formatTime(scheduled.breakIn) : "\u2014"}</td>
+                                <td>{formatTime(scheduled.timeOut)}</td>
+                              </tr>
+                            ))}
                           </tbody>
                         </table>
                       </div>

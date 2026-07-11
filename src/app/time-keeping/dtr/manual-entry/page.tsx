@@ -1,7 +1,7 @@
 "use client";
 
 import { runtimeConfig } from "@/lib/utils/runtimeConfig";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Main from "../../main/Main";
 import modalStyles from "@/styles/Modal.module.scss";
@@ -24,12 +24,42 @@ type HolidayDTO = {
 
 type WorkScheduleEntryDTO = {
   wsDateTime: string;
+  tsCode?: string | null;
   isDayOff?: boolean;
 };
 
-// Convert "MM-dd-yyyy HH:mm:ss" or "MM-dd-yyyy" custom format → "yyyy-MM-dd"
-const toIsoKey = (customDate: string): string => {
-  const [month, day, year] = customDate.split(" ")[0].split("-");
+type ScheduledTimes = {
+  tsCode: string;
+  tsName: string;
+  timeIn: string;
+  breakOut: string | null;
+  breakIn: string | null;
+  timeOut: string;
+};
+
+// Normalize supported date formats into "yyyy-MM-dd".
+// Work schedule endpoints may return either:
+//   - "MM-dd-yyyy HH:mm:ss"
+//   - "yyyy-MM-dd"
+//   - "yyyy-MM-ddTHH:mm:ss"
+// The manual form date input also stores "yyyy-MM-dd" even when the browser displays MM/dd/yyyy.
+const toIsoKey = (value: string): string => {
+  if (!value) return "";
+
+  const raw = value.trim();
+  const datePart = raw.split("T")[0].split(" ")[0].split("/").join("-");
+  const parts = datePart.split("-");
+
+  if (parts.length !== 3) return datePart;
+
+  // Already ISO: yyyy-MM-dd
+  if (parts[0].length === 4) {
+    const [year, month, day] = parts;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  // Custom/backend display: MM-dd-yyyy
+  const [month, day, year] = parts;
   return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 };
 
@@ -39,16 +69,31 @@ const toApiFormat = (isoDate: string): string => {
   return `${month}-${day}-${year} 00:00:00`;
 };
 
-// Standard PH government schedule in minutes from midnight
-const SCHEDULE_IN_MIN        = 8 * 60;   // 08:00
-const SCHEDULE_BREAK_OUT_MIN = 12 * 60;  // 12:00
-const SCHEDULE_BREAK_IN_MIN  = 13 * 60;  // 13:00
-const SCHEDULE_OUT_MIN       = 17 * 60;  // 17:00
+// Default fallback schedule in minutes from midnight. Actual saving uses the employee work schedule when available.
+const DEFAULT_SCHEDULE_IN_MIN        = 8 * 60;   // 08:00
+const DEFAULT_SCHEDULE_BREAK_OUT_MIN = 12 * 60;  // 12:00
+const DEFAULT_SCHEDULE_BREAK_IN_MIN  = 13 * 60;  // 13:00
+const DEFAULT_SCHEDULE_OUT_MIN       = 17 * 60;  // 17:00
 
 const parseTimeToMin = (t: string): number => {
   if (!t) return 0;
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
+
+  const trimmed = t.trim();
+  const meridiemMatch = trimmed.match(/\s*(AM|PM)$/i);
+  const meridiem = meridiemMatch?.[1]?.toUpperCase();
+  const timeOnly = trimmed.replace(/\s*(AM|PM)$/i, "");
+  const [hourPart, minutePart] = timeOnly.split(":");
+
+  let hour = Number(hourPart);
+  const minute = Number(minutePart ?? "0");
+
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return 0;
+
+  // Support both 24-hour values like "14:00" and 12-hour values like "02:00:00 PM".
+  if (meridiem === "PM" && hour !== 12) hour += 12;
+  if (meridiem === "AM" && hour === 12) hour = 0;
+
+  return hour * 60 + minute;
 };
 
 // HTML time input gives "HH:mm" — backend needs "HH:mm:ss"
@@ -58,12 +103,18 @@ const computeMinutes = (
   timeIn: string,
   breakOut: string,
   breakIn: string,
-  timeOut: string
+  timeOut: string,
+  scheduled?: ScheduledTimes
 ) => {
   const inMin = parseTimeToMin(timeIn);
-  const outMin = parseTimeToMin(timeOut);
-  const breakOutMin = breakOut ? parseTimeToMin(breakOut) : null;
-  const breakInMin = breakIn ? parseTimeToMin(breakIn) : null;
+  const outMin = normalizeEndMinute(inMin, parseTimeToMin(timeOut));
+  const breakOutMin = breakOut ? normalizeEndMinute(inMin, parseTimeToMin(breakOut)) : null;
+  const breakInMin = breakIn ? normalizeEndMinute(inMin, parseTimeToMin(breakIn)) : null;
+
+  const schedIn = scheduled ? parseTimeToMin(scheduled.timeIn) : DEFAULT_SCHEDULE_IN_MIN;
+  const schedBreakOut = scheduled?.breakOut ? normalizeEndMinute(schedIn, parseTimeToMin(scheduled.breakOut)) : DEFAULT_SCHEDULE_BREAK_OUT_MIN;
+  const schedBreakIn = scheduled?.breakIn ? normalizeEndMinute(schedIn, parseTimeToMin(scheduled.breakIn)) : DEFAULT_SCHEDULE_BREAK_IN_MIN;
+  const schedOut = scheduled ? normalizeEndMinute(schedIn, parseTimeToMin(scheduled.timeOut)) : DEFAULT_SCHEDULE_OUT_MIN;
 
   // Productive work minutes:
   // with break punches: (timeIn -> breakOut) + (breakIn -> timeOut)
@@ -77,19 +128,77 @@ const computeMinutes = (
   // LATE  = late time-in + late break-in
   // UNDER = early break-out + early final time-out
   // Printed CSC DTR undertime = LATE + UNDER
-  const lateTimeIn = Math.max(0, inMin - SCHEDULE_IN_MIN);
+  const lateTimeIn = Math.max(0, inMin - schedIn);
   const lateBreakIn =
-    breakInMin !== null ? Math.max(0, breakInMin - SCHEDULE_BREAK_IN_MIN) : 0;
+    breakInMin !== null && scheduled?.breakIn
+      ? Math.max(0, breakInMin - schedBreakIn)
+      : 0;
 
   const earlyBreakOut =
-    breakOutMin !== null ? Math.max(0, SCHEDULE_BREAK_OUT_MIN - breakOutMin) : 0;
-  const earlyTimeOut = Math.max(0, SCHEDULE_OUT_MIN - outMin);
+    breakOutMin !== null && scheduled?.breakOut
+      ? Math.max(0, schedBreakOut - breakOutMin)
+      : 0;
+  const earlyTimeOut = Math.max(0, schedOut - outMin);
 
   const lateMinutes = lateTimeIn + lateBreakIn;
   const undertimeMinutes = earlyBreakOut + earlyTimeOut;
-  const overtimeMinutes = Math.max(0, outMin - SCHEDULE_OUT_MIN);
+  const overtimeMinutes = Math.max(0, outMin - schedOut);
 
   return { workMinutes, lateMinutes, undertimeMinutes, overtimeMinutes };
+};
+
+const normalizeEndMinute = (startMinute: number, endMinute: number): number =>
+  endMinute < startMinute ? endMinute + 24 * 60 : endMinute;
+
+const findMatchingSchedule = (
+  schedules: ScheduledTimes[],
+  timeIn: string,
+  breakOut: string,
+  breakIn: string,
+  timeOut: string
+): ScheduledTimes | undefined => {
+  if (schedules.length === 0) return undefined;
+
+  const actualIn = parseTimeToMin(timeIn);
+  const actualOut = normalizeEndMinute(actualIn, parseTimeToMin(timeOut));
+  const actualBreakOut = breakOut ? parseTimeToMin(breakOut) : null;
+  const actualBreakIn = breakIn ? parseTimeToMin(breakIn) : null;
+
+  // First priority: exact schedule match. This handles hospital shifts like
+  // 12AM-6AM, 6AM-2PM, and 2PM-10PM without comparing them to 8AM-5PM.
+  const exact = schedules.find((schedule) => {
+    const schedIn = parseTimeToMin(schedule.timeIn);
+    const schedOut = normalizeEndMinute(schedIn, parseTimeToMin(schedule.timeOut));
+    const schedBreakOut = schedule.breakOut ? parseTimeToMin(schedule.breakOut) : null;
+    const schedBreakIn = schedule.breakIn ? parseTimeToMin(schedule.breakIn) : null;
+
+    const mainTimesMatch = schedIn === actualIn && schedOut === actualOut;
+    const breakOutMatches = actualBreakOut === null || schedBreakOut === null || schedBreakOut === actualBreakOut;
+    const breakInMatches = actualBreakIn === null || schedBreakIn === null || schedBreakIn === actualBreakIn;
+
+    return mainTimesMatch && breakOutMatches && breakInMatches;
+  });
+
+  if (exact) return exact;
+
+  // Second priority: choose the schedule with the biggest overlap with the entered time.
+  // This prevents fallback to the default 8AM-5PM schedule when the employee has multiple
+  // shifts on the same date and the entered segment belongs to one of them.
+  let bestMatch: ScheduledTimes | undefined;
+  let bestOverlap = 0;
+
+  schedules.forEach((schedule) => {
+    const schedIn = parseTimeToMin(schedule.timeIn);
+    const schedOut = normalizeEndMinute(schedIn, parseTimeToMin(schedule.timeOut));
+    const overlap = Math.max(0, Math.min(actualOut, schedOut) - Math.max(actualIn, schedIn));
+
+    if (overlap > bestOverlap) {
+      bestOverlap = overlap;
+      bestMatch = schedule;
+    }
+  });
+
+  return bestMatch;
 };
 
 // Format a JS Date → "MM-dd-yyyy 00:00:00"  (DTRDailyDTO workDate format)
@@ -127,6 +236,8 @@ export default function ManualDTREntryPage() {
   const [breakIn, setBreakIn]                   = useState("13:00");
   const [timeOut, setTimeOut]                   = useState("17:00");
   const [saving, setSaving]                     = useState(false);
+  const [previewScheduleByDate, setPreviewScheduleByDate] = useState<Map<string, ScheduledTimes[]>>(new Map());
+  const [previewAllTimeShifts, setPreviewAllTimeShifts] = useState<ScheduledTimes[]>([]);
 
   useEffect(() => {
     const role       = localStorageUtil.getEmployeeRole();
@@ -153,6 +264,92 @@ export default function ManualDTREntryPage() {
     }
   }, []);
 
+  const fetchTimeShifts = useCallback(async (): Promise<Map<string, ScheduledTimes>> => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL_ADMINISTRATIVE}/api/getAll/time-shift`);
+      if (!res.ok || res.status === 204) return new Map();
+      const data: Array<{
+        tsCode: string;
+        tsName: string;
+        timeIn: string;
+        breakOut: string | null;
+        breakIn: string | null;
+        timeOut: string;
+      }> = await res.json();
+      const map = new Map<string, ScheduledTimes>();
+      data.forEach((ts) => {
+        map.set(ts.tsCode.trim().toLowerCase(), {
+          tsCode: ts.tsCode,
+          tsName: ts.tsName,
+          timeIn: ts.timeIn,
+          breakOut: ts.breakOut,
+          breakIn: ts.breakIn,
+          timeOut: ts.timeOut,
+        });
+      });
+      return map;
+    } catch {
+      return new Map();
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPreviewSchedules = async () => {
+      if (!selectedEmployee?.employeeId || !dateFrom || !dateTo) {
+        setPreviewScheduleByDate(new Map());
+        setPreviewAllTimeShifts([]);
+        return;
+      }
+
+      try {
+        const [wsRes, timeShiftMap] = await Promise.all([
+          fetchWithAuth(
+            `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule` +
+            `?employeeId=${selectedEmployee.employeeId}` +
+            `&monthStart=${encodeURIComponent(toApiFormat(dateFrom))}` +
+            `&monthEnd=${encodeURIComponent(toApiFormat(dateTo))}`
+          ),
+          fetchTimeShifts(),
+        ]);
+
+        const nextScheduleByDate = new Map<string, ScheduledTimes[]>();
+        const allTimeShifts = Array.from(timeShiftMap.values());
+
+        if (wsRes.ok && wsRes.status !== 204) {
+          const wsData: WorkScheduleEntryDTO[] = await wsRes.json();
+          wsData.forEach((ws) => {
+            if (ws.isDayOff || !ws.tsCode) return;
+
+            const shift = timeShiftMap.get(ws.tsCode.trim().toLowerCase());
+            if (!shift) return;
+
+            const key = toIsoKey(ws.wsDateTime);
+            const current = nextScheduleByDate.get(key) ?? [];
+            nextScheduleByDate.set(key, [...current, shift]);
+          });
+        }
+
+        if (!cancelled) {
+          setPreviewScheduleByDate(nextScheduleByDate);
+          setPreviewAllTimeShifts(allTimeShifts);
+        }
+      } catch {
+        if (!cancelled) {
+          setPreviewScheduleByDate(new Map());
+          setPreviewAllTimeShifts([]);
+        }
+      }
+    };
+
+    loadPreviewSchedules();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedEmployee?.employeeId, dateFrom, dateTo, fetchTimeShifts]);
+
   const handleSave = async () => {
     if (!selectedEmployee?.employeeId) {
       Swal.fire("Warning", "Please select an employee.", "warning");
@@ -170,8 +367,9 @@ export default function ManualDTREntryPage() {
       Swal.fire("Warning", "Date From cannot be after Date To.", "warning");
       return;
     }
-    if (parseTimeToMin(timeIn) >= parseTimeToMin(timeOut)) {
-      Swal.fire("Warning", "Time Out must be after Time In.", "warning");
+    // Same-day and overnight shifts are allowed. A time-out earlier than time-in is treated as next day.
+    if (timeIn === timeOut) {
+      Swal.fire("Warning", "Time In and Time Out cannot be the same.", "warning");
       return;
     }
     if ((breakOut && !breakIn) || (!breakOut && breakIn)) {
@@ -180,9 +378,9 @@ export default function ManualDTREntryPage() {
     }
     if (breakOut && breakIn) {
       const inMin = parseTimeToMin(timeIn);
-      const breakOutMin = parseTimeToMin(breakOut);
-      const breakInMin = parseTimeToMin(breakIn);
-      const outMin = parseTimeToMin(timeOut);
+      const breakOutMin = normalizeEndMinute(inMin, parseTimeToMin(breakOut));
+      const breakInMin = normalizeEndMinute(inMin, parseTimeToMin(breakIn));
+      const outMin = normalizeEndMinute(inMin, parseTimeToMin(timeOut));
 
       if (!(inMin <= breakOutMin && breakOutMin <= breakInMin && breakInMin <= outMin)) {
         Swal.fire("Warning", "Time order must be Time In → Break Out → Break In → Time Out.", "warning");
@@ -191,17 +389,17 @@ export default function ManualDTREntryPage() {
     }
 
     const dates = getDatesInRange(dateFrom, dateTo);
-    const { workMinutes, lateMinutes, undertimeMinutes, overtimeMinutes } =
-      computeMinutes(timeIn, breakOut, breakIn, timeOut);
 
     setSaving(true);
 
     // ── Pre-fetch holidays and work schedule to skip day-off / non-working holiday dates ──
     const nonWorkingHolidaySet = new Set<string>();
     const dayOffSet            = new Set<string>();
+    const scheduleByDate       = new Map<string, ScheduledTimes[]>();
+    let allAvailableShifts: ScheduledTimes[] = [];
 
     try {
-      const [holidayRes, wsRes] = await Promise.all([
+      const [holidayRes, wsRes, fetchedTimeShiftMap] = await Promise.all([
         fetchWithAuth(`${API_BASE_URL_ADMINISTRATIVE}/api/holiday/get-all`),
         fetchWithAuth(
           `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule` +
@@ -209,7 +407,10 @@ export default function ManualDTREntryPage() {
           `&monthStart=${encodeURIComponent(toApiFormat(dateFrom))}` +
           `&monthEnd=${encodeURIComponent(toApiFormat(dateTo))}`
         ),
+        fetchTimeShifts(),
       ]);
+
+      allAvailableShifts = Array.from(fetchedTimeShiftMap.values());
 
       if (holidayRes.ok) {
         const holidays: HolidayDTO[] = await holidayRes.json();
@@ -226,7 +427,18 @@ export default function ManualDTREntryPage() {
       if (wsRes.ok && wsRes.status !== 204) {
         const wsData: WorkScheduleEntryDTO[] = await wsRes.json();
         wsData.forEach((ws) => {
-          if (ws.isDayOff) dayOffSet.add(toIsoKey(ws.wsDateTime));
+          const key = toIsoKey(ws.wsDateTime);
+          if (ws.isDayOff) {
+            dayOffSet.add(key);
+            return;
+          }
+          if (ws.tsCode) {
+            const shift = fetchedTimeShiftMap.get(ws.tsCode.trim().toLowerCase());
+            if (shift) {
+              const current = scheduleByDate.get(key) ?? [];
+              scheduleByDate.set(key, [...current, shift]);
+            }
+          }
         });
       }
     } catch {
@@ -249,6 +461,13 @@ export default function ManualDTREntryPage() {
         skippedDayOffDates.push(formatWorkDate(date).split(" ")[0]);
         continue;
       }
+      const schedulesForDate = scheduleByDate.get(isoKey) ?? [];
+      const matchedSchedule =
+        findMatchingSchedule(schedulesForDate, timeIn, breakOut, breakIn, timeOut) ??
+        findMatchingSchedule(allAvailableShifts, timeIn, breakOut, breakIn, timeOut);
+      const { workMinutes, lateMinutes, undertimeMinutes, overtimeMinutes } =
+        computeMinutes(timeIn, breakOut, breakIn, timeOut, matchedSchedule);
+
       const payload = {
         employeeId:             selectedEmployee.employeeId,
         workDate:               formatWorkDate(date),
@@ -328,9 +547,14 @@ export default function ManualDTREntryPage() {
     }
   };
 
+  const previewDateKey = dateFrom ? toIsoKey(dateFrom) : "";
+  const previewSchedules = previewDateKey ? previewScheduleByDate.get(previewDateKey) ?? [] : [];
+  const previewMatchedSchedule =
+    findMatchingSchedule(previewSchedules, timeIn, breakOut, breakIn, timeOut) ??
+    findMatchingSchedule(previewAllTimeShifts, timeIn, breakOut, breakIn, timeOut);
   const preview =
     timeIn && timeOut
-      ? computeMinutes(timeIn, breakOut, breakIn, timeOut)
+      ? computeMinutes(timeIn, breakOut, breakIn, timeOut, previewMatchedSchedule)
       : null;
 
   return (
@@ -345,7 +569,7 @@ export default function ManualDTREntryPage() {
             <div className={styles.page}>
               <div className={styles.card}>
                 <p className={styles.scheduleNote}>
-                  Standard schedule: 08:00 Time In &mdash; 12:00 Break Out &mdash; 13:00 Break In &mdash; 17:00 Time Out
+                  Computation uses the matching work schedule for the selected date. If the work schedule lookup fails, it matches the entered time against configured Time Shift records before falling back to 08:00-17:00.
                 </p>
 
                 {/* ── Employee ── */}
@@ -479,6 +703,11 @@ export default function ManualDTREntryPage() {
                     Late: <b>{preview.lateMinutes} min</b>&nbsp;&nbsp;|&nbsp;&nbsp;
                     Undertime: <b>{preview.undertimeMinutes} min</b>&nbsp;&nbsp;|&nbsp;&nbsp;
                     Overtime: <b>{preview.overtimeMinutes} min</b>
+                    {previewMatchedSchedule && (
+                      <>
+                        &nbsp;&nbsp;|&nbsp;&nbsp;Matched Shift: <b>{previewMatchedSchedule.tsCode}</b>{previewSchedules.length === 0 ? " (from Time Shift fallback)" : ""}
+                      </>
+                    )}
                   </p>
                 )}
 
