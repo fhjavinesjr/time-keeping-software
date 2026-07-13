@@ -236,6 +236,7 @@ export default function ManualDTREntryPage() {
   const [breakIn, setBreakIn]                   = useState("13:00");
   const [timeOut, setTimeOut]                   = useState("17:00");
   const [saving, setSaving]                     = useState(false);
+  const [allowHolidayWork, setAllowHolidayWork] = useState(false);
   const [previewScheduleByDate, setPreviewScheduleByDate] = useState<Map<string, ScheduledTimes[]>>(new Map());
   const [previewAllTimeShifts, setPreviewAllTimeShifts] = useState<ScheduledTimes[]>([]);
 
@@ -453,7 +454,7 @@ export default function ManualDTREntryPage() {
     for (const date of dates) {
       const isoKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
-      if (nonWorkingHolidaySet.has(isoKey)) {
+      if (!allowHolidayWork && nonWorkingHolidaySet.has(isoKey)) {
         skippedHolidayDates.push(formatWorkDate(date).split(" ")[0]);
         continue;
       }
@@ -640,6 +641,23 @@ export default function ManualDTREntryPage() {
                       One DTR entry per day will be created for the entire range.
                     </span>
                   </div>
+                </div>
+
+                <hr className={styles.divider} />
+
+                <div className={styles.formGroup}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, textTransform: "none", fontWeight: 600 }}>
+                    <input
+                      type="checkbox"
+                      checked={allowHolidayWork}
+                      onChange={(e) => setAllowHolidayWork(e.target.checked)}
+                      style={{ width: "auto" }}
+                    />
+                    Allow manual DTR on non-working holiday
+                  </label>
+                  <span className={styles.hint}>
+                    Use this for simulation or approved holiday duty only. Day-off dates will still be skipped.
+                  </span>
                 </div>
 
                 <hr className={styles.divider} />
