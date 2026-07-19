@@ -13,6 +13,7 @@ import { Employee } from "@/lib/types/Employee";
 
 const API_BASE_URL_TIMEKEEPING   = runtimeConfig.getApiUrl("timekeeping");
 const API_BASE_URL_ADMINISTRATIVE = runtimeConfig.getApiUrl("administrative");
+const API_BASE_URL_HRM = runtimeConfig.getApiUrl("hrm");
 
 type HolidayDTO = {
   holidayDate: string;
@@ -26,6 +27,14 @@ type WorkScheduleEntryDTO = {
   wsDateTime: string;
   tsCode?: string | null;
   isDayOff?: boolean;
+};
+
+type ApprovedOvertimeDTO = {
+  overtimeRequestId: number;
+  dateTimeFrom: string;
+  dateTimeTo: string;
+  workType?: string | null;
+  dutyShiftCode?: string | null;
 };
 
 type ScheduledTimes = {
@@ -147,6 +156,17 @@ const computeMinutes = (
   return { workMinutes, lateMinutes, undertimeMinutes, overtimeMinutes };
 };
 
+const asNonWorkingDutyMinutes = (
+  result: ReturnType<typeof computeMinutes>,
+) => ({
+  ...result,
+  // A rest day, scheduled day off, or non-working holiday has no
+  // ordinary scheduled hours against which late/undertime is charged.
+  lateMinutes: 0,
+  undertimeMinutes: 0,
+  overtimeMinutes: result.workMinutes,
+});
+
 const normalizeEndMinute = (startMinute: number, endMinute: number): number =>
   endMinute < startMinute ? endMinute + 24 * 60 : endMinute;
 
@@ -222,6 +242,20 @@ const getDatesInRange = (from: string, to: string): Date[] => {
   return result;
 };
 
+const parseAuthorityDateTime = (value: string) => new Date(value.replace(" ", "T"));
+
+const actualIntervalForDate = (date: Date, timeIn: string, timeOut: string) => {
+  const start = new Date(date);
+  const inMinutes = parseTimeToMin(timeIn);
+  start.setHours(Math.floor(inMinutes / 60), inMinutes % 60, 0, 0);
+  const end = new Date(date);
+  const outMinutes = normalizeEndMinute(inMinutes, parseTimeToMin(timeOut));
+  const normalizedOutMinutes = outMinutes % (24 * 60);
+  end.setHours(Math.floor(normalizedOutMinutes / 60), normalizedOutMinutes % 60, 0, 0);
+  if (outMinutes >= 24 * 60) end.setDate(end.getDate() + 1);
+  return { start, end };
+};
+
 export default function ManualDTREntryPage() {
   const router = useRouter();
 
@@ -237,8 +271,11 @@ export default function ManualDTREntryPage() {
   const [timeOut, setTimeOut]                   = useState("17:00");
   const [saving, setSaving]                     = useState(false);
   const [allowHolidayWork, setAllowHolidayWork] = useState(false);
+  const [allowDayOffWork, setAllowDayOffWork]   = useState(false);
   const [previewScheduleByDate, setPreviewScheduleByDate] = useState<Map<string, ScheduledTimes[]>>(new Map());
   const [previewAllTimeShifts, setPreviewAllTimeShifts] = useState<ScheduledTimes[]>([]);
+  const [previewHolidayDates, setPreviewHolidayDates] = useState<Set<string>>(new Set());
+  const [previewDayOffDates, setPreviewDayOffDates] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const role       = localStorageUtil.getEmployeeRole();
@@ -301,11 +338,14 @@ export default function ManualDTREntryPage() {
       if (!selectedEmployee?.employeeId || !dateFrom || !dateTo) {
         setPreviewScheduleByDate(new Map());
         setPreviewAllTimeShifts([]);
+        setPreviewHolidayDates(new Set());
+        setPreviewDayOffDates(new Set());
         return;
       }
 
       try {
-        const [wsRes, timeShiftMap] = await Promise.all([
+        const [holidayRes, wsRes, timeShiftMap] = await Promise.all([
+          fetchWithAuth(`${API_BASE_URL_ADMINISTRATIVE}/api/holiday/get-all`),
           fetchWithAuth(
             `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule` +
             `?employeeId=${selectedEmployee.employeeId}` +
@@ -316,17 +356,39 @@ export default function ManualDTREntryPage() {
         ]);
 
         const nextScheduleByDate = new Map<string, ScheduledTimes[]>();
+        const nextHolidayDates = new Set<string>();
+        const nextDayOffDates = new Set<string>();
         const allTimeShifts = Array.from(timeShiftMap.values());
+
+        if (holidayRes.ok && holidayRes.status !== 204) {
+          const holidays: HolidayDTO[] = await holidayRes.json();
+          holidays
+            .filter((holiday) =>
+              holiday.isActive &&
+              !holiday.isWorkingHoliday &&
+              holiday.holidayType !== "SPECIAL_WORKING"
+            )
+            .forEach((holiday) => {
+              const raw = holiday.observedDate?.trim() && holiday.observedDate !== holiday.holidayDate
+                ? holiday.observedDate
+                : holiday.holidayDate;
+              nextHolidayDates.add(toIsoKey(raw));
+            });
+        }
 
         if (wsRes.ok && wsRes.status !== 204) {
           const wsData: WorkScheduleEntryDTO[] = await wsRes.json();
           wsData.forEach((ws) => {
-            if (ws.isDayOff || !ws.tsCode) return;
+            const key = toIsoKey(ws.wsDateTime);
+            if (ws.isDayOff) {
+              nextDayOffDates.add(key);
+              return;
+            }
+            if (!ws.tsCode) return;
 
             const shift = timeShiftMap.get(ws.tsCode.trim().toLowerCase());
             if (!shift) return;
 
-            const key = toIsoKey(ws.wsDateTime);
             const current = nextScheduleByDate.get(key) ?? [];
             nextScheduleByDate.set(key, [...current, shift]);
           });
@@ -335,11 +397,15 @@ export default function ManualDTREntryPage() {
         if (!cancelled) {
           setPreviewScheduleByDate(nextScheduleByDate);
           setPreviewAllTimeShifts(allTimeShifts);
+          setPreviewHolidayDates(nextHolidayDates);
+          setPreviewDayOffDates(nextDayOffDates);
         }
       } catch {
         if (!cancelled) {
           setPreviewScheduleByDate(new Map());
           setPreviewAllTimeShifts([]);
+          setPreviewHolidayDates(new Set());
+          setPreviewDayOffDates(new Set());
         }
       }
     };
@@ -398,9 +464,11 @@ export default function ManualDTREntryPage() {
     const dayOffSet            = new Set<string>();
     const scheduleByDate       = new Map<string, ScheduledTimes[]>();
     let allAvailableShifts: ScheduledTimes[] = [];
+    let approvedAuthorities: ApprovedOvertimeDTO[] = [];
+    let authorityLookupAvailable = false;
 
     try {
-      const [holidayRes, wsRes, fetchedTimeShiftMap] = await Promise.all([
+      const [holidayRes, wsRes, approvedOtRes, fetchedTimeShiftMap] = await Promise.all([
         fetchWithAuth(`${API_BASE_URL_ADMINISTRATIVE}/api/holiday/get-all`),
         fetchWithAuth(
           `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule` +
@@ -408,10 +476,20 @@ export default function ManualDTREntryPage() {
           `&monthStart=${encodeURIComponent(toApiFormat(dateFrom))}` +
           `&monthEnd=${encodeURIComponent(toApiFormat(dateTo))}`
         ),
+        fetchWithAuth(
+          `${API_BASE_URL_HRM}/api/overtime-request/get-approved/${selectedEmployee.employeeId}`
+        ),
         fetchTimeShifts(),
       ]);
 
       allAvailableShifts = Array.from(fetchedTimeShiftMap.values());
+      if (approvedOtRes.ok && approvedOtRes.status !== 204) {
+        const data: ApprovedOvertimeDTO[] = await approvedOtRes.json();
+        approvedAuthorities = Array.isArray(data) ? data : [];
+        authorityLookupAvailable = true;
+      } else if (approvedOtRes.status === 204) {
+        authorityLookupAvailable = true;
+      }
 
       if (holidayRes.ok) {
         const holidays: HolidayDTO[] = await holidayRes.json();
@@ -450,6 +528,7 @@ export default function ManualDTREntryPage() {
     const failedDates:          string[] = [];
     const skippedHolidayDates:  string[] = [];
     const skippedDayOffDates:   string[] = [];
+    const unauthorizedDutyDates: string[] = [];
 
     for (const date of dates) {
       const isoKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -458,16 +537,39 @@ export default function ManualDTREntryPage() {
         skippedHolidayDates.push(formatWorkDate(date).split(" ")[0]);
         continue;
       }
-      if (dayOffSet.has(isoKey)) {
+      if (!allowDayOffWork && dayOffSet.has(isoKey)) {
         skippedDayOffDates.push(formatWorkDate(date).split(" ")[0]);
         continue;
+      }
+      const isHolidayDutyDate = nonWorkingHolidaySet.has(isoKey);
+      const isDayOffDutyDate = dayOffSet.has(isoKey);
+      if (isHolidayDutyDate || isDayOffDutyDate) {
+        const actual = actualIntervalForDate(date, timeIn, timeOut);
+        const matchingAuthority = authorityLookupAvailable && approvedAuthorities.some((authority) => {
+          const authorityStart = parseAuthorityDateTime(authority.dateTimeFrom);
+          const authorityEnd = parseAuthorityDateTime(authority.dateTimeTo);
+          if (Number.isNaN(authorityStart.getTime()) || Number.isNaN(authorityEnd.getTime())) return false;
+          const workType = (authority.workType ?? "").toUpperCase();
+          const typeMatches =
+            (isHolidayDutyDate && workType === "HOLIDAY_DUTY") ||
+            (isDayOffDutyDate && ["DAY_OFF_DUTY", "REST_DAY_DUTY"].includes(workType));
+          return typeMatches && actual.start >= authorityStart && actual.end <= authorityEnd;
+        });
+        if (!matchingAuthority) {
+          unauthorizedDutyDates.push(formatWorkDate(date).split(" ")[0]);
+          continue;
+        }
       }
       const schedulesForDate = scheduleByDate.get(isoKey) ?? [];
       const matchedSchedule =
         findMatchingSchedule(schedulesForDate, timeIn, breakOut, breakIn, timeOut) ??
         findMatchingSchedule(allAvailableShifts, timeIn, breakOut, breakIn, timeOut);
+      const computed = computeMinutes(timeIn, breakOut, breakIn, timeOut, matchedSchedule);
+      const isPermittedNonWorkingDuty =
+        (allowHolidayWork && nonWorkingHolidaySet.has(isoKey)) ||
+        (allowDayOffWork && dayOffSet.has(isoKey));
       const { workMinutes, lateMinutes, undertimeMinutes, overtimeMinutes } =
-        computeMinutes(timeIn, breakOut, breakIn, timeOut, matchedSchedule);
+        isPermittedNonWorkingDuty ? asNonWorkingDutyMinutes(computed) : computed;
 
       const payload = {
         employeeId:             selectedEmployee.employeeId,
@@ -518,6 +620,8 @@ export default function ManualDTREntryPage() {
       skippedLines.push(`<b>Skipped (Non-working holiday):</b> ${skippedHolidayDates.join(", ")}`);
     if (skippedDayOffDates.length > 0)
       skippedLines.push(`<b>Skipped (Day Off):</b> ${skippedDayOffDates.join(", ")}`);
+    if (unauthorizedDutyDates.length > 0)
+      skippedLines.push(`<b>Skipped (No approved matching Overtime/Duty Order):</b> ${unauthorizedDutyDates.join(", ")}`);
     if (failedDates.length > 0)
       skippedLines.push(`<b>Failed (may already exist):</b> ${failedDates.join(", ")}`);
 
@@ -553,10 +657,19 @@ export default function ManualDTREntryPage() {
   const previewMatchedSchedule =
     findMatchingSchedule(previewSchedules, timeIn, breakOut, breakIn, timeOut) ??
     findMatchingSchedule(previewAllTimeShifts, timeIn, breakOut, breakIn, timeOut);
-  const preview =
-    timeIn && timeOut
-      ? computeMinutes(timeIn, breakOut, breakIn, timeOut, previewMatchedSchedule)
-      : null;
+  const previewIsHoliday = previewHolidayDates.has(previewDateKey);
+  const previewIsDayOff = previewDayOffDates.has(previewDateKey);
+  const previewWillBeSkipped =
+    (previewIsHoliday && !allowHolidayWork) ||
+    (previewIsDayOff && !allowDayOffWork);
+  const preview = (() => {
+    if (!timeIn || !timeOut) return null;
+    const computed = computeMinutes(timeIn, breakOut, breakIn, timeOut, previewMatchedSchedule);
+    const isPermittedNonWorkingDuty =
+      (previewIsHoliday && allowHolidayWork) ||
+      (previewIsDayOff && allowDayOffWork);
+    return isPermittedNonWorkingDuty ? asNonWorkingDutyMinutes(computed) : computed;
+  })();
 
   return (
     <Main>
@@ -656,7 +769,22 @@ export default function ManualDTREntryPage() {
                     Allow manual DTR on non-working holiday
                   </label>
                   <span className={styles.hint}>
-                    Use this for simulation or approved holiday duty only. Day-off dates will still be skipped.
+                    Requires an approved Holiday Duty Order covering the employee, date, and entered time. Day-off permission is controlled separately.
+                  </span>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, textTransform: "none", fontWeight: 600 }}>
+                    <input
+                      type="checkbox"
+                      checked={allowDayOffWork}
+                      onChange={(e) => setAllowDayOffWork(e.target.checked)}
+                      style={{ width: "auto" }}
+                    />
+                    Allow manual DTR on rest day / scheduled day-off
+                  </label>
+                  <span className={styles.hint}>
+                    Requires an approved Rest-Day or Scheduled Day-Off Order covering the employee, date, and entered time. Work type remains defined by that authority.
                   </span>
                 </div>
 
@@ -716,6 +844,12 @@ export default function ManualDTREntryPage() {
                 {/* Live minute preview */}
                 {preview && (
                   <p className={styles.preview}>
+                    {previewWillBeSkipped && (
+                      <>
+                        <b>This date will be skipped unless the applicable non-working-day checkbox is enabled.</b>
+                        <br />
+                      </>
+                    )}
                     Computed &mdash;&nbsp;
                     Work: <b>{preview.workMinutes} min</b>&nbsp;&nbsp;|&nbsp;&nbsp;
                     Late: <b>{preview.lateMinutes} min</b>&nbsp;&nbsp;|&nbsp;&nbsp;
