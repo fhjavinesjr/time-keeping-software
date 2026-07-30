@@ -1036,21 +1036,23 @@ export default function WorkSchedule() {
             >
               Work Schedule
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("report")}
-              style={{
-                padding: "0.65rem 1rem",
-                border: "none",
-                borderBottom: activeTab === "report" ? "3px solid #2563eb" : "3px solid transparent",
-                background: "transparent",
-                color: activeTab === "report" ? "#1d4ed8" : "#475569",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              Report
-            </button>
+            {canAdd && canEdit ? (
+              <button
+                  type="button"
+                  onClick={() => setActiveTab("report")}
+                  style={{
+                    padding: "0.65rem 1rem",
+                    border: "none",
+                    borderBottom: activeTab === "report" ? "3px solid #2563eb" : "3px solid transparent",
+                    background: "transparent",
+                    color: activeTab === "report" ? "#1d4ed8" : "#475569",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Report
+                </button>
+            ) : ""}
           </div>
 
           {activeTab === "calendar" ? (
