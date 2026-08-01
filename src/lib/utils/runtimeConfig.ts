@@ -41,7 +41,7 @@ const UI_ENV_MAP: Record<UiApp, string> = {
   hrm: process.env.NEXT_PUBLIC_UI_URL_HRM ?? "http://localhost:3085",
   timekeeping: process.env.NEXT_PUBLIC_UI_URL_TIMEKEEPING ?? "http://localhost:3083",
   payroll: process.env.NEXT_PUBLIC_UI_URL_PAYROLL ?? "http://localhost:3087",
-  "employee-portal": "http://localhost:3081",
+  "employee-portal": process.env.NEXT_PUBLIC_UI_URL_EMPLOYEE_PORTAL ?? "http://localhost:3081",
 };
 
 export const runtimeConfig = {

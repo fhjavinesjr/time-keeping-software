@@ -17,7 +17,8 @@ export default function LayoutClientWrapper({
   const pathname = usePathname() || "";
   const hideSidebar =
     pathname.endsWith("/login") ||
-    pathname.endsWith("/registration");
+    pathname.endsWith("/registration") ||
+    pathname.endsWith("/sso");
   const [showUserDetails, setShowUserDetails] = useState(false);
   const [headerUserInfo, setHeaderUserInfo] = useState({
     employeeNo: "",
