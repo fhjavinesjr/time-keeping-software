@@ -21,6 +21,7 @@ type DTRSegmentDTO = {
   lateMinutes: number;
   undertimeMinutes: number;
   overtimeMinutes: number;
+  sourceType?: "ADMS" | "MANUAL" | string;
 };
 
 type DTRDailyDTO = {
@@ -236,39 +237,38 @@ export default function DTRTable({ records, scheduleMap = new Map(), overlayDeta
                 {expanded === idx && (
                   <tr>
                     <td className={styles.segmentCell} colSpan={8}>
-                      {rec.segments && rec.segments.length > 0 ? (
-                      <div className={styles.segmentPanel}>
-                        <table className={styles.segmentTable}>
-                          <thead>
-                            <tr>
-                              <th>Segment</th>
-                              <th>Time In</th>
-                              <th>Break Out</th>
-                              <th>Break In</th>
-                              <th>Time Out</th>
-                              <th>
-                                <span className={styles.headerWithHelp}>
-                                  Type
-                                  <span
-                                    className={styles.helpIcon}
-                                    title="Overnight means Time Out occurred on the next calendar day."
-                                    aria-label="Overnight means Time Out occurred on the next calendar day."
-                                  >
-                                    i
+                      {rec.segments && rec.segments.length > 0 && (
+                        <div className={styles.segmentPanel}>
+                          <table className={styles.segmentTable}>
+                            <thead>
+                              <tr>
+                                <th>Segment</th>
+                                <th>Time In</th>
+                                <th>Break Out</th>
+                                <th>Break In</th>
+                                <th>Time Out</th>
+                                <th>
+                                  <span className={styles.headerWithHelp}>
+                                    Type
+                                    <span
+                                      className={styles.helpIcon}
+                                      title="Overnight means Time Out occurred on the next calendar day."
+                                      aria-label="Overnight means Time Out occurred on the next calendar day."
+                                    >
+                                      i
+                                    </span>
                                   </span>
-                                </span>
-                              </th>
-                              <th>Work</th>
-                              <th>Late</th>
-                              <th>Under</th>
-                              <th>Over</th>
-                              {(canEdit || canDelete) && <th>Actions</th>}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {rec.segments.map((seg) => {
+                                </th>
+                                <th>Work</th>
+                                <th>Late</th>
+                                <th>Under</th>
+                                <th>Over</th>
+                                {(canEdit || canDelete) && <th>Actions</th>}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rec.segments.map((seg) => {
                                 const overnight = isOvernightSegment(seg);
-
                                 return (
                                   <tr key={seg.dtrSegmentId}>
                                     <td>{seg.segmentNo}</td>
@@ -279,23 +279,17 @@ export default function DTRTable({ records, scheduleMap = new Map(), overlayDeta
                                       <span className={styles.timeOutCell}>
                                         {formatTime(seg.timeOut ?? "")}
                                         {overnight && (
-                                          <span className={styles.nextDayMarker}>
-                                            (+1 day)
-                                          </span>
+                                          <span className={styles.nextDayMarker}>(+1 day)</span>
                                         )}
                                       </span>
                                     </td>
                                     <td>
                                       {overnight ? (
-                                        <span
-                                          className={`${styles.segmentTypeBadge} ${styles.segmentTypeOvernight}`}
-                                        >
+                                        <span className={`${styles.segmentTypeBadge} ${styles.segmentTypeOvernight}`}>
                                           Overnight
                                         </span>
                                       ) : (
-                                        <span
-                                          className={`${styles.segmentTypeBadge} ${styles.segmentTypeSameDay}`}
-                                        >
+                                        <span className={`${styles.segmentTypeBadge} ${styles.segmentTypeSameDay}`}>
                                           Same day
                                         </span>
                                       )}
@@ -304,31 +298,37 @@ export default function DTRTable({ records, scheduleMap = new Map(), overlayDeta
                                     <td>{seg.lateMinutes}</td>
                                     <td>{seg.undertimeMinutes}</td>
                                     <td>{seg.overtimeMinutes}</td>
-                                    <td className={styles.actionCell}>
-                                      {canEdit && (
-                                        <button
-                                          className={styles.editSegBtn}
-                                          onClick={() => onEditSegment?.(rec, seg)}
-                                        >
-                                          Edit
-                                        </button>
-                                      )}
-                                      {canDelete && (
-                                        <button
-                                          className={styles.deleteSegBtn}
-                                          onClick={() => onDeleteSegment?.(rec, seg)}
-                                        >
-                                          Delete
-                                        </button>
-                                      )}
-                                    </td>
+                                    {(canEdit || canDelete) && (
+                                      <td className={styles.actionCell}>
+                                        {canEdit && (
+                                          <button
+                                            className={styles.editSegBtn}
+                                            onClick={() => onEditSegment?.(rec, seg)}
+                                          >
+                                            Edit
+                                          </button>
+                                        )}
+                                        {canDelete && (
+                                          <button
+                                            className={styles.deleteSegBtn}
+                                            onClick={() => onDeleteSegment?.(rec, seg)}
+                                          >
+                                            Delete
+                                          </button>
+                                        )}
+                                      </td>
+                                    )}
                                   </tr>
                                 );
                               })}
-                          </tbody>
-                        </table>
-                      </div>
-                      ) : overlayDetail ? (
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {/* Employee-request details remain visible even when Search also
+                          produced biometric/manual segments for the same date. */}
+                      {overlayDetail && (
                         <div className={styles.overlayPanel}>
                           {overlayDetail.kind === "PASS_SLIP" && (
                             <table className={styles.overlayTable}>
@@ -391,7 +391,7 @@ export default function DTRTable({ records, scheduleMap = new Map(), overlayDeta
                             </table>
                           )}
                         </div>
-                      ) : null}
+                      )}
                     </td>
                   </tr>
                 )}

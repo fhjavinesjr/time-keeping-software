@@ -590,6 +590,7 @@ export default function ManualDTREntryPage() {
             lateMinutes,
             undertimeMinutes,
             overtimeMinutes,
+            sourceType:        "MANUAL",
           },
         ],
       };

@@ -35,6 +35,7 @@ type DTRSegmentDTO = {
   lateMinutes: number;
   undertimeMinutes: number;
   overtimeMinutes: number;
+  sourceType?: "ADMS" | "MANUAL" | string;
 };
 
 type DTRDailyDTO = {
@@ -387,15 +388,16 @@ export default function DTRPage() {
     }
   };
 
-  // Overlay approved leave applications onto records that are still ABSENT.
-  // PRESENT, HOLIDAY, and REST DAY rows are never overwritten.
+  // Approved Leave is an authoritative employee request. Biometric punches may
+  // remain visible as segments, but Search must not hide the approved leave status.
+  // Leave Monetization remains excluded in fetchLeaveMap because it is not an
+  // attendance event with an inclusive work-date range.
   const overlayLeaves = (
     rows: DTRDailyDTO[],
     leaveDateMap: Map<string, string>
   ): DTRDailyDTO[] => {
     if (leaveDateMap.size === 0) return rows;
     return rows.map((rec) => {
-      if (rec.attendanceStatus !== "ABSENT") return rec;
       const dateKey = toIsoDateKey(rec.workDate);
       const leaveType = leaveDateMap.get(dateKey);
       return leaveType ? { ...rec, attendanceStatus: leaveType } : rec;
@@ -422,16 +424,13 @@ export default function DTRPage() {
     }
   };
 
-  // Overlay approved CTOs onto any non-Present record.
-  // An approved CTO overrides ABSENT, HOLIDAY, and REST DAY because the employee
-  // explicitly used their COC hours for that day. Never overrides Present.
+  // Approved CTO remains authoritative even when biometric punches exist.
   const overlayCtos = (
     rows: DTRDailyDTO[],
     ctoDateSet: Set<string>
   ): DTRDailyDTO[] => {
     if (ctoDateSet.size === 0) return rows;
     return rows.map((rec) => {
-      if (rec.attendanceStatus.toLowerCase().includes("present")) return rec;
       const dateKey = toIsoDateKey(rec.workDate);
       return ctoDateSet.has(dateKey) ? { ...rec, attendanceStatus: "CTO" } : rec;
     });
@@ -462,16 +461,15 @@ export default function DTRPage() {
     }
   };
 
-  // Overlay approved Pass Slips onto any non-Present record.
-  // Never overrides a CTO or Present row.
+  // Pass Slip may coexist with biometric segments. It does not override CTO,
+  // but it is not hidden merely because Search created a Present transaction.
   const overlayPassSlips = (
     rows: DTRDailyDTO[],
     passSlipDetailMap: Map<string, OverlayDetail>
   ): DTRDailyDTO[] => {
     if (passSlipDetailMap.size === 0) return rows;
     return rows.map((rec) => {
-      const s = rec.attendanceStatus.toLowerCase();
-      if (s.includes("present") || s === "cto") return rec;
+      if (rec.attendanceStatus.toLowerCase() === "cto") return rec;
       const dateKey = toIsoDateKey(rec.workDate);
       return passSlipDetailMap.has(dateKey)
         ? { ...rec, attendanceStatus: "Pass Slip" }
@@ -516,8 +514,8 @@ export default function DTRPage() {
     }
   };
 
-  // Overlay approved Official Engagements onto any non-Present, non-CTO record.
-  // Pass Slip is also preserved (OE doesn't override it).
+  // Official Business / Official Time may coexist with biometric segments.
+  // Preserve the existing request priority of CTO and Pass Slip.
   const overlayOfficialEngagements = (
     rows: DTRDailyDTO[],
     oeDetailMap: Map<string, OverlayDetail>
@@ -525,7 +523,7 @@ export default function DTRPage() {
     if (oeDetailMap.size === 0) return rows;
     return rows.map((rec) => {
       const s = rec.attendanceStatus.toLowerCase();
-      if (s.includes("present") || s === "cto" || s.includes("pass slip")) return rec;
+      if (s === "cto" || s.includes("pass slip")) return rec;
       const dateKey = toIsoDateKey(rec.workDate);
       const detail = oeDetailMap.get(dateKey);
       return detail && detail.kind === "OFFICIAL_ENGAGEMENT"
@@ -560,10 +558,9 @@ export default function DTRPage() {
     }
   };
 
-  // Overlay approved Time Corrections onto ABSENT-only records.
-  // An approved TC means the employee was actually present with corrected times.
-  // Never overrides Present, CTO, Pass Slip, or OE rows.
-  // Also computes late/undertime/work minutes from corrected times vs scheduled shift.
+  // Approved Time Correction is the highest-priority attendance correction.
+  // It overrides the displayed status/computation even when Search has produced
+  // biometric segments. The original ADMS punches remain untouched for audit.
   const overlayTimeCorrections = (
     rows: DTRDailyDTO[],
     tcDetailMap: Map<string, OverlayDetail>,
@@ -571,8 +568,6 @@ export default function DTRPage() {
   ): DTRDailyDTO[] => {
     if (tcDetailMap.size === 0) return rows;
     return rows.map((rec) => {
-      const s = rec.attendanceStatus.toLowerCase();
-      if (!s.includes("absent")) return rec;
       const dateKey = toIsoDateKey(rec.workDate);
       const detail = tcDetailMap.get(dateKey);
       if (!detail || detail.kind !== "TIME_CORRECTED") return rec;
@@ -636,7 +631,7 @@ export default function DTRPage() {
   };
 
   // Fetch DTR records
-  const fetchDTR = async () => {
+  const fetchDTR = async (reconcileAdms = false) => {
     if (!selectedEmployee) {
       Swal.fire({
         title: "Warning",
@@ -657,12 +652,16 @@ export default function DTRPage() {
     }
     try {
       if (selectedEmployee && fromDate && toDate) {
+        const dtrQuery = `employeeId=${selectedEmployee.employeeId}&fromDate=${encodeURIComponent(
+          fromDate
+        )}&toDate=${encodeURIComponent(toDate)}`;
+        const dtrUrl = reconcileAdms
+          ? `${API_BASE_URL_TIMEKEEPING}/api/dtr-daily/reconcile?${dtrQuery}`
+          : `${API_BASE_URL_TIMEKEEPING}/api/dtr-daily?${dtrQuery}`;
+
         const res = await fetchWithAuth(
-          `${API_BASE_URL_TIMEKEEPING}/api/dtr-daily?employeeId=${
-            selectedEmployee.employeeId
-          }&fromDate=${encodeURIComponent(
-            fromDate
-          )}&toDate=${encodeURIComponent(toDate)}`
+          dtrUrl,
+          reconcileAdms ? { method: "POST" } : undefined
         );
 
         if (res.status === 204) {
@@ -886,123 +885,67 @@ export default function DTRPage() {
 
   const handleSaveEditSegment = async () => {
     if (!editSegmentState) return;
-    const { record, segment, timeIn, breakOut, breakIn, timeOut } = editSegmentState;
+    const { segment, timeIn, breakOut, breakIn, timeOut } = editSegmentState;
 
     if (!timeIn) {
       Swal.fire("Validation Error", "Time In is required.", "warning");
       return;
     }
-
-    const dateKey = toIsoDateKey(record.workDate);
-    const schedules = scheduleMap.get(dateKey) ?? [];
-    const scheduled =
-      schedules.find((shift) =>
-        shift.timeIn?.substring(0, 5) === timeIn &&
-        (!timeOut || shift.timeOut?.substring(0, 5) === timeOut)
-      ) ?? schedules[Math.max(0, (segment.segmentNo ?? 1) - 1)];
-    const SCHED_IN  = scheduled ? timeToMinutes(scheduled.timeIn)  : 8 * 60;
-    const SCHED_OUT = scheduled ? timeToMinutes(scheduled.timeOut) : 17 * 60;
-    const SCHED_BREAK_OUT = scheduled?.breakOut ? timeToMinutes(scheduled.breakOut) : null;
-    const SCHED_BREAK_IN = scheduled?.breakIn ? timeToMinutes(scheduled.breakIn) : null;
-
-    const inMin = timeToMinutes(timeIn);
-
-    // If Time Out is empty the segment is still open — compute what we can from available times
-    let workMinutes = 0, lateMinutes = 0, undertimeMinutes = 0, overtimeMinutes = 0;
-
-    // Determine the last known time and break deduction based on what fields are filled.
-    // Rules:
-    //   - Time Out present              → last = Time Out;  break = BreakOut→BreakIn if both present
-    //   - Break In present, no Time Out → last = Break In;  break = BreakOut→BreakIn
-    //   - Break Out only, no Break In   → last = Break Out; break = 0 (employee left during break)
-    //   - Only Time In                  → nothing to compute yet
-    if (timeOut || breakOut) {
-      let lastMin: number;
-      let breakMins = 0;
-
-      if (timeOut) {
-        lastMin = timeToMinutes(timeOut);
-        if (lastMin < inMin) lastMin += 24 * 60; // overnight
-        if (breakOut && breakIn) {
-          breakMins = Math.max(0, timeToMinutes(breakIn) - timeToMinutes(breakOut));
-        }
-      } else if (breakIn) {
-        // Back from break but no Time Out yet — last known = Break In; work excludes break time
-        const breakInMin  = timeToMinutes(breakIn);
-        const breakOutMin = timeToMinutes(breakOut!);
-        breakMins = Math.max(0, breakInMin - breakOutMin);
-        lastMin   = breakInMin;
-      } else {
-        // Only Break Out — last known = Break Out (departed during/at break)
-        lastMin = timeToMinutes(breakOut!);
-      }
-
-      workMinutes = Math.max(0, lastMin - inMin - breakMins);
-
-      // Agency/CSC-style UI separation:
-      // LATE  = late TIME_IN + late BREAK_IN
-      // UNDER = early BREAK_OUT + early TIME_OUT
-      // The printed CSC DTR undertime column should combine LATE + UNDER.
-      const lateTimeIn = Math.max(0, inMin - SCHED_IN);
-      const lateBreakIn =
-        breakIn && SCHED_BREAK_IN !== null
-          ? Math.max(0, timeToMinutes(breakIn) - SCHED_BREAK_IN)
-          : 0;
-      const earlyBreakOut =
-        breakOut && SCHED_BREAK_OUT !== null
-          ? Math.max(0, SCHED_BREAK_OUT - timeToMinutes(breakOut))
-          : 0;
-      const earlyTimeOut =
-        timeOut && lastMin < SCHED_OUT ? Math.max(0, SCHED_OUT - lastMin) : 0;
-
-      lateMinutes = lateTimeIn + lateBreakIn;
-      undertimeMinutes = earlyBreakOut + earlyTimeOut;
-      overtimeMinutes = lastMin > SCHED_OUT ? Math.max(0, lastMin - SCHED_OUT) : 0;
+    if (!segment.dtrSegmentId) {
+      Swal.fire("Validation Error", "This segment has no valid transaction ID.", "warning");
+      return;
     }
-
-    const updatedSegment: DTRSegmentDTO = {
-      ...segment,
-      timeIn:   toTimeStr(timeIn),
-      breakOut: breakOut ? toTimeStr(breakOut) : null,
-      breakIn:  breakIn  ? toTimeStr(breakIn)  : null,
-      timeOut:  timeOut  ? toTimeStr(timeOut)  : null,
-      workMinutes,
-      lateMinutes,
-      undertimeMinutes,
-      overtimeMinutes,
-    };
-
-    const updatedSegments = record.segments.map((s) =>
-      s.dtrSegmentId === segment.dtrSegmentId ? updatedSegment : s
-    );
-
-    const totalWorkMinutes = updatedSegments.reduce((sum, s) => sum + s.workMinutes, 0);
-    const totalLateMinutes = updatedSegments.reduce((sum, s) => sum + s.lateMinutes, 0);
-    const totalUndertimeMinutes = updatedSegments.reduce((sum, s) => sum + s.undertimeMinutes, 0);
-    const totalOvertimeMinutes = updatedSegments.reduce((sum, s) => sum + s.overtimeMinutes, 0);
-
-    const payload: DTRDailyDTO = {
-      ...record,
-      segments: updatedSegments,
-      totalWorkMinutes,
-      totalLateMinutes,
-      totalUndertimeMinutes,
-      totalOvertimeMinutes,
-    };
+    if (breakIn && !breakOut) {
+      Swal.fire("Validation Error", "Break In requires Break Out.", "warning");
+      return;
+    }
+    if (timeOut && Boolean(breakOut) !== Boolean(breakIn)) {
+      Swal.fire(
+        "Validation Error",
+        "A completed segment must contain both Break Out and Break In, or neither.",
+        "warning"
+      );
+      return;
+    }
 
     setIsSavingSegment(true);
     try {
-      const res = await fetchWithAuth(`${API_BASE_URL_TIMEKEEPING}/api/dtr-daily`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+      const res = await fetchWithAuth(
+        `${API_BASE_URL_TIMEKEEPING}/api/dtr-daily/segment/${segment.dtrSegmentId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            timeIn: toTimeStr(timeIn),
+            breakOut: breakOut ? toTimeStr(breakOut) : null,
+            breakIn: breakIn ? toTimeStr(breakIn) : null,
+            timeOut: timeOut ? toTimeStr(timeOut) : null,
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const message = await res.text();
+        throw new Error(message || `Failed: ${res.status}`);
+      }
+
       setEditSegmentState(null);
-      await Swal.fire({ title: "Saved", text: "Segment updated successfully.", icon: "success", timer: 1500, showConfirmButton: false });
-      fetchDTR();
-    } catch {
-      Swal.fire("Error", "Failed to update segment.", "error");
+      await Swal.fire({
+        title: "Saved",
+        text: "Segment recalculated and saved as a protected Manual adjustment.",
+        icon: "success",
+        timer: 1800,
+        showConfirmButton: false,
+      });
+
+      // Read-only reload. Do not trigger ADMS reconciliation immediately after
+      // an administrator correction.
+      await fetchDTR(false);
+    } catch (error) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : "Failed to update segment.";
+      Swal.fire("Error", message, "error");
     } finally {
       setIsSavingSegment(false);
     }
@@ -1010,8 +953,8 @@ export default function DTRPage() {
 
   const handleDeleteSegment = async (record: DTRDailyDTO, segment: DTRSegmentDTO) => {
     const confirm = await Swal.fire({
-      title: "Delete Segment?",
-      text: `Remove segment ${segment.segmentNo} from ${record.workDate.split(" ")[0]}?`,
+      title: "Delete DTR Transaction?",
+      text: `Remove segment ${segment.segmentNo} from ${record.workDate.split(" ")[0]}? It will remain deleted until Search is clicked again.`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonText: "Yes, delete",
@@ -1020,42 +963,31 @@ export default function DTRPage() {
     });
     if (!confirm.isConfirmed) return;
 
-    const updatedSegments = record.segments.filter(
-      (s) => s.dtrSegmentId !== segment.dtrSegmentId
-    );
-
-    const totalWorkMinutes = updatedSegments.reduce((sum, s) => sum + s.workMinutes, 0);
-    const totalLateMinutes = updatedSegments.reduce((sum, s) => sum + s.lateMinutes, 0);
-    const totalUndertimeMinutes = updatedSegments.reduce((sum, s) => sum + s.undertimeMinutes, 0);
-    const totalOvertimeMinutes = updatedSegments.reduce((sum, s) => sum + s.overtimeMinutes, 0);
-
-    const payload: DTRDailyDTO = {
-      ...record,
-      segments: updatedSegments,
-      totalWorkMinutes,
-      totalLateMinutes,
-      totalUndertimeMinutes,
-      totalOvertimeMinutes,
-      attendanceStatus: (() => {
-        if (updatedSegments.length > 0) return record.attendanceStatus;
-        const isoKey = toIsoDateKey(record.workDate);
-        if ((record.holidayDetails?.length ?? 0) > 0) return "HOLIDAY";
-        if (dayOffDates.has(isoKey)) return "REST DAY";
-        return "ABSENT";
-      })(),
-    };
+    if (!segment.dtrSegmentId) {
+      await Swal.fire("Error", "This DTR segment has no valid transaction ID.", "error");
+      return;
+    }
 
     try {
-      const res = await fetchWithAuth(`${API_BASE_URL_TIMEKEEPING}/api/dtr-daily`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetchWithAuth(
+        `${API_BASE_URL_TIMEKEEPING}/api/dtr-daily/segment/${segment.dtrSegmentId}`,
+        { method: "DELETE" }
+      );
       if (!res.ok) throw new Error(`Failed: ${res.status}`);
-      await Swal.fire({ title: "Deleted", text: "Segment deleted.", icon: "success", timer: 1500, showConfirmButton: false });
-      fetchDTR();
+
+      await Swal.fire({
+        title: "Deleted",
+        text: "DTR transaction deleted. Click Search to rebuild it from ADMS punches.",
+        icon: "success",
+        timer: 1700,
+        showConfirmButton: false,
+      });
+
+      // Read-only reload: do not reconcile ADMS here, otherwise the deleted
+      // transaction would be recreated immediately.
+      await fetchDTR(false);
     } catch {
-      Swal.fire("Error", "Failed to delete segment.", "error");
+      Swal.fire("Error", "Failed to delete DTR transaction.", "error");
     }
   };
 
@@ -1192,7 +1124,7 @@ export default function DTRPage() {
                   </div>
 
                   <div className={styles.actions}>
-                    <button className={styles.searchButton} onClick={fetchDTR}>
+                    <button className={styles.searchButton} onClick={() => fetchDTR(true)}>
                       Search
                     </button>
                     <button
