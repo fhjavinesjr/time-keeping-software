@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/start-app.js",
-    "build": "next build",
-    "start": "node scripts/start-app.js",
-    "lint": "next lint",
+    "build": "next build && npm run package:prod",
+    "package:prod": "node scripts/package-prod.mjs",
+    "verify:prod": "node scripts/verify-prod.mjs",
+    "start": "next start -p 3083",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts,.tsx",
     "clean": "rimraf .next"
   },
   "dependencies": {

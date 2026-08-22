@@ -11,6 +11,16 @@
 
 import { localStorageUtil } from "./localStorageUtil";
 
+declare global {
+  interface Window {
+    __ISOFT_RUNTIME_CONFIG__?: Record<string, string | undefined>;
+  }
+}
+
+function deployedConfig(): Record<string, string | undefined> {
+  return typeof window === "undefined" ? {} : window.__ISOFT_RUNTIME_CONFIG__ ?? {};
+}
+
 type ApiService = "administrative" | "hrm" | "timekeeping" | "payroll";
 type UiApp = "administrative" | "hrm" | "timekeeping" | "payroll" | "employee-portal";
 
@@ -27,6 +37,21 @@ const UI_KEY_MAP: Record<UiApp, string> = {
   timekeeping: "ui.url.timekeeping",
   payroll: "ui.url.payroll",
   "employee-portal": "ui.url.employee-portal",
+};
+
+const API_ENV_KEY_MAP: Record<ApiService, string> = {
+  administrative: "NEXT_PUBLIC_API_BASE_URL_ADMINISTRATIVE",
+  hrm: "NEXT_PUBLIC_API_BASE_URL_HRM",
+  timekeeping: "NEXT_PUBLIC_API_BASE_URL_TIMEKEEPING",
+  payroll: "NEXT_PUBLIC_API_BASE_URL_PAYROLL",
+};
+
+const UI_ENV_KEY_MAP: Record<UiApp, string> = {
+  administrative: "NEXT_PUBLIC_UI_URL_ADMINISTRATIVE",
+  hrm: "NEXT_PUBLIC_UI_URL_HRM",
+  timekeeping: "NEXT_PUBLIC_UI_URL_TIMEKEEPING",
+  payroll: "NEXT_PUBLIC_UI_URL_PAYROLL",
+  "employee-portal": "NEXT_PUBLIC_UI_URL_EMPLOYEE_PORTAL",
 };
 
 const API_ENV_MAP: Record<ApiService, string | undefined> = {
@@ -50,7 +75,7 @@ export const runtimeConfig = {
       const stored = localStorageUtil.getSystemConfig(API_KEY_MAP[service]);
       if (stored) return stored;
     }
-    return API_ENV_MAP[service] ?? "";
+    return deployedConfig()[API_ENV_KEY_MAP[service]] ?? API_ENV_MAP[service] ?? "";
   },
 
   getUiUrl(app: UiApp): string {
@@ -58,7 +83,7 @@ export const runtimeConfig = {
       const stored = localStorageUtil.getSystemConfig(UI_KEY_MAP[app]);
       if (stored) return stored;
     }
-    return UI_ENV_MAP[app];
+    return deployedConfig()[UI_ENV_KEY_MAP[app]] ?? UI_ENV_MAP[app];
   },
 
   getInactivityTimeout(): number {
@@ -66,6 +91,11 @@ export const runtimeConfig = {
       const stored = localStorageUtil.getSystemConfig("security.inactivity.timeout");
       if (stored) return parseInt(stored, 10);
     }
-    return parseInt(process.env.NEXT_PUBLIC_INACTIVITY_TIMEOUT ?? "1800", 10);
+    return parseInt(
+      deployedConfig().NEXT_PUBLIC_INACTIVITY_TIMEOUT ??
+        process.env.NEXT_PUBLIC_INACTIVITY_TIMEOUT ??
+        "1800",
+      10
+    );
   },
 };

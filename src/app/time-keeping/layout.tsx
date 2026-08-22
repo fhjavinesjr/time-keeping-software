@@ -1,6 +1,7 @@
 //Layout.tsx is the main parent file
 
 import type { Metadata } from "next";
+import Script from "next/script";
 import './globals.css';
 import React from "react";
 import LayoutClientWrapper from "./layoutClientWrapper";
@@ -18,6 +19,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <Script src="/runtime-config.js" strategy="beforeInteractive" />
+      </head>
       <body className="Time-Keeping" >
         
         <PageAuthentication>

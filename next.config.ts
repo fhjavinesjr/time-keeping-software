@@ -3,6 +3,7 @@ const path = require('path');
 
 const nextConfig: NextConfig = {
   /* config options here */
+  output: "standalone",
   productionBrowserSourceMaps: true,
   reactStrictMode: true,
   sassOptions: {
