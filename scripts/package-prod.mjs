@@ -34,10 +34,10 @@ function publicProductionEnvironment() {
     .reduce((combined, values) => ({ ...combined, ...values }), {});
 
   const publicKeys = [...new Set([...Object.keys(fromFiles), ...Object.keys(process.env)])]
-    .filter((key) => key.startsWith("NEXT_PUBLIC_"))
+    .filter((key) => key.startsWith("NEXT_PUBLIC_") || key === "HRIS_CONFIG_BOOTSTRAP_URL")
     .sort();
 
-  if (publicKeys.length === 0) {
+  if (!publicKeys.some((key) => key.startsWith("NEXT_PUBLIC_"))) {
     throw new Error(
       "No NEXT_PUBLIC_* values were found. Set the module's public production configuration before building."
     );

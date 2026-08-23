@@ -1,12 +1,12 @@
 /**
  * runtimeConfig — resolves configuration values at runtime.
  *
- * Priority: localStorage (populated at login from the backend SystemConfig API)
- *           → process.env fallback (baked at build time)
+ * Priority: centralized startup settings → deployment environment fallback
+ *           → cached post-login settings → baked environment fallback.
  *
  * This allows an administrator to update URLs and settings in the
  * Technical Settings UI without requiring a rebuild. Changes take
- * effect on the next login or full page refresh.
+ * effect on the next full page load.
  */
 
 import { localStorageUtil } from "./localStorageUtil";
@@ -71,29 +71,43 @@ const UI_ENV_MAP: Record<UiApp, string> = {
 
 export const runtimeConfig = {
   getApiUrl(service: ApiService): string {
+    const deployed = deployedConfig();
+    const centralized = deployed[API_KEY_MAP[service]];
+    if (centralized) return centralized;
+    const runtimeFallback = deployed[API_ENV_KEY_MAP[service]];
+    if (runtimeFallback) return runtimeFallback;
     if (typeof window !== "undefined") {
       const stored = localStorageUtil.getSystemConfig(API_KEY_MAP[service]);
       if (stored) return stored;
     }
-    return deployedConfig()[API_ENV_KEY_MAP[service]] ?? API_ENV_MAP[service] ?? "";
+    return API_ENV_MAP[service] ?? "";
   },
 
   getUiUrl(app: UiApp): string {
+    const deployed = deployedConfig();
+    const centralized = deployed[UI_KEY_MAP[app]];
+    if (centralized) return centralized;
+    const runtimeFallback = deployed[UI_ENV_KEY_MAP[app]];
+    if (runtimeFallback) return runtimeFallback;
     if (typeof window !== "undefined") {
       const stored = localStorageUtil.getSystemConfig(UI_KEY_MAP[app]);
       if (stored) return stored;
     }
-    return deployedConfig()[UI_ENV_KEY_MAP[app]] ?? UI_ENV_MAP[app];
+    return UI_ENV_MAP[app];
   },
 
   getInactivityTimeout(): number {
+    const deployed = deployedConfig();
+    const centralized = deployed["security.inactivity.timeout"];
+    if (centralized) return parseInt(centralized, 10);
+    const runtimeFallback = deployed.NEXT_PUBLIC_INACTIVITY_TIMEOUT;
+    if (runtimeFallback) return parseInt(runtimeFallback, 10);
     if (typeof window !== "undefined") {
       const stored = localStorageUtil.getSystemConfig("security.inactivity.timeout");
       if (stored) return parseInt(stored, 10);
     }
     return parseInt(
-      deployedConfig().NEXT_PUBLIC_INACTIVITY_TIMEOUT ??
-        process.env.NEXT_PUBLIC_INACTIVITY_TIMEOUT ??
+      process.env.NEXT_PUBLIC_INACTIVITY_TIMEOUT ??
         "1800",
       10
     );
