@@ -69,8 +69,8 @@ export async function GET(): Promise<Response> {
           runtimeConfig[key] = value.trim().replace(/\/$/, "");
         }
       }
-    } catch (error) {
-      console.warn("Unable to load centralized HRIS runtime configuration; using deployment fallbacks.", error);
+    } catch {
+      console.info("Centralized HRIS runtime configuration is unavailable; using deployment fallbacks.");
     }
   }
 

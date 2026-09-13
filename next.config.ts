@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-const path = require('path');
+import path from "node:path";
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -10,7 +10,12 @@ const nextConfig: NextConfig = {
     includePaths: [path.join(__dirname, 'src', 'styles')],
   },
   images: {
-    domains: ['cdn.builder.io'], // Add your allowed image hostnames here
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'cdn.builder.io',
+      },
+    ],
     dangerouslyAllowSVG: true,
   },
 };
