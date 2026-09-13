@@ -18,10 +18,8 @@ import {
   getFirstDateOfMonth,
   getLastDateOfMonth,
 } from "@/lib/utils/dateFormatUtils";
-const API_BASE_URL_ADMINISTRATIVE =
-  runtimeConfig.getApiUrl("administrative");
-const API_BASE_URL_TIMEKEEPING =
-  runtimeConfig.getApiUrl("timekeeping");
+const API_BASE_URL_ADMINISTRATIVE = runtimeConfig.getApiUrl("administrative");
+const API_BASE_URL_TIMEKEEPING = runtimeConfig.getApiUrl("timekeeping");
 import to12HourFormat from "@/lib/utils/convert24To12HrFormat";
 import { WorkScheduleDTO } from "@/lib/types/WorkScheduleDTO";
 import { format, parseISO } from "date-fns";
@@ -107,16 +105,20 @@ const getHolidayCategory = (holiday: HolidayDTO) => {
 };
 
 export default function WorkSchedule() {
-  const [workScheduleEvents, setWorkScheduleEvents] = useState<ShiftEvent[]>([]);
+  const [workScheduleEvents, setWorkScheduleEvents] = useState<ShiftEvent[]>(
+    [],
+  );
   const [holidayEvents, setHolidayEvents] = useState<HolidayEvent[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
-    null
+    null,
   );
   const [userRole, setUserRole] = useState<string | null>(null);
   const [employeeInputValue, setEmployeeInputValue] = useState<string>("");
   const [timeShift, setTimeShift] = useState<TimeShift[]>([]);
-  const [currentCalendarDate, setCurrentCalendarDate] = useState<Date>(new Date());
+  const [currentCalendarDate, setCurrentCalendarDate] = useState<Date>(
+    new Date(),
+  );
   const canAdd = localStorageUtil.canAdd("tk.workSchedule");
   const canEdit = localStorageUtil.canEdit("tk.workSchedule");
   const canDelete = localStorageUtil.canDelete("tk.workSchedule");
@@ -124,47 +126,56 @@ export default function WorkSchedule() {
   const [areas, setAreas] = useState<Area[]>([]);
   const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([]);
   const [reportAreaId, setReportAreaId] = useState<number | "">("");
-  const [reportBusinessUnitId, setReportBusinessUnitId] = useState<number | "">("");
+  const [reportBusinessUnitId, setReportBusinessUnitId] = useState<number | "">(
+    "",
+  );
   const [reportFromDate, setReportFromDate] = useState("");
   const [reportToDate, setReportToDate] = useState("");
   const [reportPreparedBy, setReportPreparedBy] = useState("");
   const [reportPreparedByPos, setReportPreparedByPos] = useState("");
-  const [reportPreparedByEmployee, setReportPreparedByEmployee] = useState<Employee | null>(null);
+  const [reportPreparedByEmployee, setReportPreparedByEmployee] =
+    useState<Employee | null>(null);
   const [reportApprovedBy, setReportApprovedBy] = useState("");
   const [reportApprovedByPos, setReportApprovedByPos] = useState("");
-  const [reportApprovedByEmployee, setReportApprovedByEmployee] = useState<Employee | null>(null);
+  const [reportApprovedByEmployee, setReportApprovedByEmployee] =
+    useState<Employee | null>(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   const filteredReportBusinessUnits = businessUnits.filter(
-    (unit) => reportAreaId !== "" && unit.areasId === reportAreaId
+    (unit) => reportAreaId !== "" && unit.areasId === reportAreaId,
   );
 
-  const toEmployeeOption = (employee: Employee) => `[${employee.employeeNo}] ${employee.fullName}`;
+  const toEmployeeOption = (employee: Employee) =>
+    `[${employee.employeeNo}] ${employee.fullName}`;
 
   const findEmployeeFromOption = (value: string) =>
     employees.find(
-      (employee) => toEmployeeOption(employee).toLowerCase() === value.toLowerCase()
+      (employee) =>
+        toEmployeeOption(employee).toLowerCase() === value.toLowerCase(),
     ) ?? null;
 
-  const fetchCurrentAppointmentPosition = useCallback(async (employeeId: string) => {
-    if (!employeeId) return "";
+  const fetchCurrentAppointmentPosition = useCallback(
+    async (employeeId: string) => {
+      if (!employeeId) return "";
 
-    try {
-      const response = await fetchWithAuth(
-        `${API_BASE_URL_TIMEKEEPING}/api/work-schedule/signatory-position?employeeId=${encodeURIComponent(employeeId)}`
-      );
+      try {
+        const response = await fetchWithAuth(
+          `${API_BASE_URL_TIMEKEEPING}/api/work-schedule/signatory-position?employeeId=${encodeURIComponent(employeeId)}`,
+        );
 
-      if (!response.ok) {
+        if (!response.ok) {
+          return "";
+        }
+
+        const data: { position?: string | null } = await response.json();
+        return data.position ?? "";
+      } catch (error) {
+        console.error("Failed to fetch signatory position:", error);
         return "";
       }
-
-      const data: { position?: string | null } = await response.json();
-      return data.position ?? "";
-    } catch (error) {
-      console.error("Failed to fetch signatory position:", error);
-      return "";
-    }
-  }, []);
+    },
+    [],
+  );
 
   const handlePreparedByChange = async (value: string) => {
     setReportPreparedBy(value);
@@ -177,7 +188,9 @@ export default function WorkSchedule() {
       return;
     }
 
-    const position = await fetchCurrentAppointmentPosition(String(matchedEmployee.employeeId));
+    const position = await fetchCurrentAppointmentPosition(
+      String(matchedEmployee.employeeId),
+    );
     setReportPreparedByPos(position);
   };
 
@@ -192,7 +205,9 @@ export default function WorkSchedule() {
       return;
     }
 
-    const position = await fetchCurrentAppointmentPosition(String(matchedEmployee.employeeId));
+    const position = await fetchCurrentAppointmentPosition(
+      String(matchedEmployee.employeeId),
+    );
     setReportApprovedByPos(position);
   };
 
@@ -212,7 +227,7 @@ export default function WorkSchedule() {
   const fetchTimeShifts = useCallback(async () => {
     try {
       const res = await fetchWithAuth(
-        `${API_BASE_URL_ADMINISTRATIVE}/api/getAll/time-shift`
+        `${API_BASE_URL_ADMINISTRATIVE}/api/getAll/time-shift`,
       );
 
       if (!res.ok) {
@@ -231,7 +246,7 @@ export default function WorkSchedule() {
   const fetchHolidays = useCallback(async () => {
     try {
       const res = await fetchWithAuth(
-        `${API_BASE_URL_ADMINISTRATIVE}/api/holiday/get-all`
+        `${API_BASE_URL_ADMINISTRATIVE}/api/holiday/get-all`,
       );
 
       if (!res.ok) {
@@ -242,25 +257,27 @@ export default function WorkSchedule() {
       const data: HolidayDTO[] = await res.json();
       const activeHolidays = (data || []).filter((holiday) => holiday.isActive);
 
-      const mappedHolidayEvents: HolidayEvent[] = activeHolidays.map((holiday) => {
-        const effectiveDate = getHolidayDisplayDate(holiday);
-        const holidayCategory = getHolidayCategory(holiday);
+      const mappedHolidayEvents: HolidayEvent[] = activeHolidays.map(
+        (holiday) => {
+          const effectiveDate = getHolidayDisplayDate(holiday);
+          const holidayCategory = getHolidayCategory(holiday);
 
-        return {
-          id: `holiday-${holiday.holidayId ?? holiday.name}-${effectiveDate.value}`,
-          title: holiday.name,
-          date: toDateInputValue(effectiveDate.value),
-          classNames: ["holiday-event", `holiday-${holidayCategory}`],
-          extendedProps: {
-            eventType: "holiday",
-            holidayCategory,
-            holidayType: holiday.holidayType,
-            withPay: holiday.withPay,
-            isWorkingHoliday: holiday.isWorkingHoliday,
-            sourceDate: effectiveDate.source,
-          },
-        };
-      });
+          return {
+            id: `holiday-${holiday.holidayId ?? holiday.name}-${effectiveDate.value}`,
+            title: holiday.name,
+            date: toDateInputValue(effectiveDate.value),
+            classNames: ["holiday-event", `holiday-${holidayCategory}`],
+            extendedProps: {
+              eventType: "holiday",
+              holidayCategory,
+              holidayType: holiday.holidayType,
+              withPay: holiday.withPay,
+              isWorkingHoliday: holiday.isWorkingHoliday,
+              sourceDate: effectiveDate.source,
+            },
+          };
+        },
+      );
 
       setHolidayEvents(mappedHolidayEvents);
       console.log("Successfully fetched holidays", mappedHolidayEvents);
@@ -270,50 +287,51 @@ export default function WorkSchedule() {
   }, []);
 
   // Fetch All Work Schedule by Selected employee (page load)
-  const fetchAllWorkSchedule = useCallback(async (
-    employeeId: string | null,
-    year: number,
-    month: number
-  ) => {
-    try {
-      // build start & end dates for the month
-      const monthStart = getFirstDateOfMonth(month, year);
-      const monthEnd = getLastDateOfMonth(month, year);
+  const fetchAllWorkSchedule = useCallback(
+    async (employeeId: string | null, year: number, month: number) => {
+      try {
+        // build start & end dates for the month
+        const monthStart = getFirstDateOfMonth(month, year);
+        const monthEnd = getLastDateOfMonth(month, year);
 
-      const res = await fetchWithAuth(
-        `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule?employeeId=${employeeId}&monthStart=${monthStart}&monthEnd=${monthEnd}`
-      );
+        const res = await fetchWithAuth(
+          `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule?employeeId=${employeeId}&monthStart=${monthStart}&monthEnd=${monthEnd}`,
+        );
 
-      if (res.status === 204) {
-        console.log("No work schedule found for this employee/month");
-        setWorkScheduleEvents([]); // clear schedule-only events
-        return;
+        if (res.status === 204) {
+          console.log("No work schedule found for this employee/month");
+          setWorkScheduleEvents([]); // clear schedule-only events
+          return;
+        }
+
+        if (!res.ok) {
+          throw new Error(`Failed to fetch work schedule: ${res.status}`);
+        }
+
+        const data = await res.json();
+
+        // map backend DTOs to FullCalendar events
+        const mappedEvents: ShiftEvent[] = data.map((ws: WorkScheduleDTO) => ({
+          wsId: ws.wsId,
+          title: ws.isDayOff ? "Day Off" : (ws.tsCode ?? ""),
+          date: toDateInputValue(ws.wsDateTime),
+          classNames: ws.isDayOff ? ["day-off-event"] : ["work-schedule-event"],
+          extendedProps: {
+            eventType: ws.isDayOff
+              ? ("dayOff" as const)
+              : ("workSchedule" as const),
+            isDayOff: ws.isDayOff ?? false,
+          },
+        }));
+
+        setWorkScheduleEvents(mappedEvents);
+        console.log("Successfully fetched work schedule", mappedEvents);
+      } catch (error) {
+        console.error("Error fetching work schedule:", error);
       }
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch work schedule: ${res.status}`);
-      }
-
-      const data = await res.json();
-
-      // map backend DTOs to FullCalendar events
-      const mappedEvents: ShiftEvent[] = data.map((ws: WorkScheduleDTO) => ({
-        wsId: ws.wsId,
-        title: ws.isDayOff ? "Day Off" : (ws.tsCode ?? ""),
-        date: toDateInputValue(ws.wsDateTime),
-        classNames: ws.isDayOff ? ["day-off-event"] : ["work-schedule-event"],
-        extendedProps: {
-          eventType: ws.isDayOff ? ("dayOff" as const) : ("workSchedule" as const),
-          isDayOff: ws.isDayOff ?? false,
-        },
-      }));
-
-      setWorkScheduleEvents(mappedEvents);
-      console.log("Successfully fetched work schedule", mappedEvents);
-    } catch (error) {
-      console.error("Error fetching work schedule:", error);
-    }
-  }, []);
+    },
+    [],
+  );
 
   // On mount: load role and employee list
   useEffect(() => {
@@ -331,13 +349,26 @@ export default function WorkSchedule() {
     const storedEmployees = localStorageUtil.getEmployees();
     setEmployees(storedEmployees);
 
-    if (empNo && ((!canAdd && !canEdit) || (canAdd && !canEdit) || (!canAdd && canEdit))) {
-      const empFromList = stored?.find(e => e.employeeNo === empNo) ?? null;
+    if (
+      empNo &&
+      ((!canAdd && !canEdit) || (canAdd && !canEdit) || (!canAdd && canEdit))
+    ) {
+      const empFromList = stored?.find((e) => e.employeeNo === empNo) ?? null;
       if (empFromList) {
         setSelectedEmployee(empFromList);
-        setEmployeeInputValue(`[${empFromList.employeeNo}] ${empFromList.fullName}`);
+        setEmployeeInputValue(
+          `[${empFromList.employeeNo}] ${empFromList.fullName}`,
+        );
       } else if (fullname) {
-        const own: Employee = { employeeId: String(employeeId ?? ""), employeeNo: empNo, fullName: fullname, role: role ?? "", biometricNo: "", isSearched: false, isCleared: false };
+        const own: Employee = {
+          employeeId: String(employeeId ?? ""),
+          employeeNo: empNo,
+          fullName: fullname,
+          role: role ?? "",
+          biometricNo: "",
+          isSearched: false,
+          isCleared: false,
+        };
         setSelectedEmployee(own);
         setEmployeeInputValue(`[${empNo}] ${fullname}`);
       }
@@ -356,7 +387,7 @@ export default function WorkSchedule() {
       fetchAllWorkSchedule(
         selectedEmployee.employeeId,
         today.getFullYear(),
-        today.getMonth() + 1
+        today.getMonth() + 1,
       );
     } else {
       setWorkScheduleEvents([]); // clear schedule-only events if no employee
@@ -367,7 +398,7 @@ export default function WorkSchedule() {
     employeeId: string,
     tsCode: string | null,
     workDate: string,
-    wsId?: number // optional
+    wsId?: number, // optional
   ) => {
     try {
       if (!tsCode) {
@@ -485,38 +516,40 @@ export default function WorkSchedule() {
   // Utility: Get all events for a date
   const getEventsForDate = (dateStr: string, excludedWsId?: number) =>
     workScheduleEvents.filter(
-      (event) => event.date === dateStr && event.wsId !== excludedWsId
+      (event) => event.date === dateStr && event.wsId !== excludedWsId,
     );
 
   // Utility: Get shift by code
   const getShiftByCode = (code: string) => {
     const normalizedCode = normalizeShiftCode(code);
     return timeShift.find(
-      (shift) => normalizeShiftCode(shift.tsCode) === normalizedCode
+      (shift) => normalizeShiftCode(shift.tsCode) === normalizedCode,
     );
   };
 
   const hasDuplicateShiftCode = (
     dateStr: string,
     shiftCode: string,
-    excludedWsId?: number
+    excludedWsId?: number,
   ) => {
     const normalizedCode = normalizeShiftCode(shiftCode);
 
     return getEventsForDate(dateStr, excludedWsId).some(
-      (event) => normalizeShiftCode(event.title) === normalizedCode
+      (event) => normalizeShiftCode(event.title) === normalizedCode,
     );
   };
 
-
   // Utility: Check overlap (with type safety, handles overnight)
-  const isOverlapping = (newShift: TimeShift, existingShifts: TimeShift[]): boolean => {
+  const isOverlapping = (
+    newShift: TimeShift,
+    existingShifts: TimeShift[],
+  ): boolean => {
     if (!newShift || !newShift.timeIn || !newShift.timeOut) return false;
     const [newStart, newEnd] = getShiftRange(newShift);
-    return existingShifts.filter(Boolean).some(s => {
+    return existingShifts.filter(Boolean).some((s) => {
       if (!s || !s.timeIn || !s.timeOut) return false;
       const [sStart, sEnd] = getShiftRange(s);
-      return (newStart < sEnd && newEnd > sStart); // overlap
+      return newStart < sEnd && newEnd > sStart; // overlap
     });
   };
 
@@ -565,13 +598,23 @@ export default function WorkSchedule() {
         });
         return;
       }
-      const wsDateTime = format(parseISO(`${arg.dateStr}T00:00:00`), "MM-dd-yyyy HH:mm:ss");
+      const wsDateTime = format(
+        parseISO(`${arg.dateStr}T00:00:00`),
+        "MM-dd-yyyy HH:mm:ss",
+      );
       try {
-        const res = await fetchWithAuth(`${API_BASE_URL_TIMEKEEPING}/api/create/work-schedule`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ employeeId: selectedEmployee.employeeId, wsDateTime, isDayOff: true }),
-        });
+        const res = await fetchWithAuth(
+          `${API_BASE_URL_TIMEKEEPING}/api/create/work-schedule`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              employeeId: selectedEmployee.employeeId,
+              wsDateTime,
+              isDayOff: true,
+            }),
+          },
+        );
         if (!res.ok) throw new Error(`Failed: ${res.status}`);
         const metadata = await res.json();
         setWorkScheduleEvents((prev) => [
@@ -584,7 +627,12 @@ export default function WorkSchedule() {
             extendedProps: { eventType: "dayOff" as const, isDayOff: true },
           },
         ]);
-        Swal.fire({ title: "Done!", text: "Rest day saved.", icon: "success", returnFocus: false });
+        Swal.fire({
+          title: "Done!",
+          text: "Rest day saved.",
+          icon: "success",
+          returnFocus: false,
+        });
       } catch (err) {
         console.error("Error saving day off:", err);
         Swal.fire({
@@ -598,7 +646,9 @@ export default function WorkSchedule() {
     }
 
     // --- Shift assignment path (isConfirmed) ---
-    const hasDayOffEvent = dayEvents.some((e) => e.extendedProps?.eventType === "dayOff");
+    const hasDayOffEvent = dayEvents.some(
+      (e) => e.extendedProps?.eventType === "dayOff",
+    );
     if (hasDayOffEvent) {
       await Swal.fire({
         title: "Warning",
@@ -611,7 +661,7 @@ export default function WorkSchedule() {
 
     // Only include valid shift objects
     const dayShifts = dayEvents
-      .map(e => getShiftByCode(e.title))
+      .map((e) => getShiftByCode(e.title))
       .filter((s): s is TimeShift => !!s);
 
     const { value: tsCode } = await Swal.fire({
@@ -633,7 +683,8 @@ export default function WorkSchedule() {
           return "This shift code is already assigned for this day.";
         }
         // Overlap check (robust)
-        if (isOverlapping(shift, dayShifts)) return "Shift overlaps with existing shift.";
+        if (isOverlapping(shift, dayShifts))
+          return "Shift overlaps with existing shift.";
         // 24h check (robust)
         const total = getTotalMinutes([...dayShifts, shift]);
         if (total > 24 * 60) return "Total shift hours exceed 24 hours.";
@@ -653,7 +704,7 @@ export default function WorkSchedule() {
       const success = await saveOrUpdateWorkSchedule(
         selectedEmployee.employeeId,
         shift.tsCode,
-        arg.dateStr
+        arg.dateStr,
       );
       if (success) {
         setWorkScheduleEvents((prev) => [
@@ -696,7 +747,12 @@ export default function WorkSchedule() {
         const success = await deleteWorkSchedule(wsId);
         if (success) {
           setWorkScheduleEvents((prev) => prev.filter((e) => e.wsId !== wsId));
-          Swal.fire({ title: "Removed!", text: "Rest day removed from schedule.", icon: "success", returnFocus: false });
+          Swal.fire({
+            title: "Removed!",
+            text: "Rest day removed from schedule.",
+            icon: "success",
+            returnFocus: false,
+          });
         }
       }
       return;
@@ -704,9 +760,12 @@ export default function WorkSchedule() {
 
     if (eventType === "holiday") {
       const sourceDate = clickInfo.event.extendedProps?.sourceDate;
-      const holidayType = (clickInfo.event.extendedProps?.holidayType || "") as string;
+      const holidayType = (clickInfo.event.extendedProps?.holidayType ||
+        "") as string;
       const withPay = clickInfo.event.extendedProps?.withPay ? "Yes" : "No";
-      const workingHoliday = clickInfo.event.extendedProps?.isWorkingHoliday ? "Yes" : "No";
+      const workingHoliday = clickInfo.event.extendedProps?.isWorkingHoliday
+        ? "Yes"
+        : "No";
 
       Swal.fire({
         title: clickInfo.event.title,
@@ -790,7 +849,7 @@ export default function WorkSchedule() {
         selectedEmployee.employeeId,
         shift.tsCode,
         wsDateTime,
-        wsId
+        wsId,
       );
       if (success) {
         // Re-fetch all work schedules for the current employee and month
@@ -798,14 +857,14 @@ export default function WorkSchedule() {
         fetchAllWorkSchedule(
           selectedEmployee.employeeId,
           dateObj.getFullYear(),
-          dateObj.getMonth() + 1
+          dateObj.getMonth() + 1,
         );
       }
     } else if (result.isDenied) {
       const success = await deleteWorkSchedule(wsId);
       if (success) {
         setWorkScheduleEvents((prev) =>
-          prev.filter((event) => event.wsId !== wsId)
+          prev.filter((event) => event.wsId !== wsId),
         );
         Swal.fire({
           title: "Deleted!",
@@ -854,9 +913,14 @@ export default function WorkSchedule() {
         const dayNames = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
         const days: number[] = dayNames
           .map((d, i) => ({ d, i }))
-          .filter(({ d }) => (document.getElementById(`af-${d}`) as HTMLInputElement)?.checked)
+          .filter(
+            ({ d }) =>
+              (document.getElementById(`af-${d}`) as HTMLInputElement)?.checked,
+          )
           .map(({ i }) => i);
-        const monthInput = document.getElementById("af-month") as HTMLInputElement;
+        const monthInput = document.getElementById(
+          "af-month",
+        ) as HTMLInputElement;
         if (!monthInput?.value) {
           Swal.showValidationMessage("Please select a month.");
           return false;
@@ -893,7 +957,7 @@ export default function WorkSchedule() {
     // Filter out dates that already have any WorkSchedule entry
     const existingDates = new Set(workScheduleEvents.map((e) => e.date));
     const filteredDates = generatedDates.filter(
-      (d) => !existingDates.has(toDateInputValue(d))
+      (d) => !existingDates.has(toDateInputValue(d)),
     );
 
     if (filteredDates.length === 0) {
@@ -929,7 +993,7 @@ export default function WorkSchedule() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }
+        },
       );
       if (!res.ok) throw new Error(`Failed: ${res.status}`);
       const autoFillResult = await res.json();
@@ -941,11 +1005,7 @@ export default function WorkSchedule() {
       });
       // Use year/monthNum from formValues directly — currentCalendarDate can
       // lag or point to the wrong month depending on how datesSet fired.
-      fetchAllWorkSchedule(
-        selectedEmployee.employeeId,
-        year,
-        monthNum
-      );
+      fetchAllWorkSchedule(selectedEmployee.employeeId, year, monthNum);
     } catch (err) {
       console.error("Error auto-filling rest days:", err);
       Swal.fire({
@@ -959,15 +1019,27 @@ export default function WorkSchedule() {
 
   const handleGenerateWorkScheduleReport = async () => {
     if (reportAreaId === "") {
-      await Swal.fire({ icon: "warning", title: "Missing Area", text: "Please select an area first." });
+      await Swal.fire({
+        icon: "warning",
+        title: "Missing Area",
+        text: "Please select an area first.",
+      });
       return;
     }
     if (!reportFromDate || !reportToDate) {
-      await Swal.fire({ icon: "warning", title: "Missing Date Range", text: "Please select Date From and Date To." });
+      await Swal.fire({
+        icon: "warning",
+        title: "Missing Date Range",
+        text: "Please select Date From and Date To.",
+      });
       return;
     }
     if (new Date(reportFromDate) > new Date(reportToDate)) {
-      await Swal.fire({ icon: "warning", title: "Invalid Date Range", text: "Date From cannot be after Date To." });
+      await Swal.fire({
+        icon: "warning",
+        title: "Invalid Date Range",
+        text: "Date From cannot be after Date To.",
+      });
       return;
     }
 
@@ -977,9 +1049,13 @@ export default function WorkSchedule() {
         areaId: String(reportAreaId),
         fromDate: reportFromDate,
         toDate: reportToDate,
-        preparedBy: (reportPreparedByEmployee?.fullName ?? reportPreparedBy).trim(),
+        preparedBy: (
+          reportPreparedByEmployee?.fullName ?? reportPreparedBy
+        ).trim(),
         preparedByPos: reportPreparedByPos.trim(),
-        approvedBy: (reportApprovedByEmployee?.fullName ?? reportApprovedBy).trim(),
+        approvedBy: (
+          reportApprovedByEmployee?.fullName ?? reportApprovedBy
+        ).trim(),
         approvedByPos: reportApprovedByPos.trim(),
       });
       if (reportBusinessUnitId !== "") {
@@ -987,10 +1063,12 @@ export default function WorkSchedule() {
       }
 
       const response = await fetchWithAuth(
-        `${API_BASE_URL_TIMEKEEPING}/api/work-schedule/report?${params.toString()}`
+        `${API_BASE_URL_TIMEKEEPING}/api/work-schedule/report?${params.toString()}`,
       );
       if (!response.ok) {
-        throw new Error(`Failed to generate Work Schedule report (${response.status})`);
+        throw new Error(
+          `Failed to generate Work Schedule report (${response.status})`,
+        );
       }
 
       const blob = await response.blob();
@@ -1020,14 +1098,24 @@ export default function WorkSchedule() {
           <h2 className={modalStyles.mainTitle}>Work Schedule</h2>
         </div>
         <div className={modalStyles.modalBody}>
-          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", borderBottom: "1px solid #dbe3ef" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "0.5rem",
+              marginBottom: "1rem",
+              borderBottom: "1px solid #dbe3ef",
+            }}
+          >
             <button
               type="button"
               onClick={() => setActiveTab("calendar")}
               style={{
                 padding: "0.65rem 1rem",
                 border: "none",
-                borderBottom: activeTab === "calendar" ? "3px solid #2563eb" : "3px solid transparent",
+                borderBottom:
+                  activeTab === "calendar"
+                    ? "3px solid #2563eb"
+                    : "3px solid transparent",
                 background: "transparent",
                 color: activeTab === "calendar" ? "#1d4ed8" : "#475569",
                 fontWeight: 700,
@@ -1038,249 +1126,284 @@ export default function WorkSchedule() {
             </button>
             {canAdd && canEdit ? (
               <button
-                  type="button"
-                  onClick={() => setActiveTab("report")}
-                  style={{
-                    padding: "0.65rem 1rem",
-                    border: "none",
-                    borderBottom: activeTab === "report" ? "3px solid #2563eb" : "3px solid transparent",
-                    background: "transparent",
-                    color: activeTab === "report" ? "#1d4ed8" : "#475569",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  Report
-                </button>
-            ) : ""}
+                type="button"
+                onClick={() => setActiveTab("report")}
+                style={{
+                  padding: "0.65rem 1rem",
+                  border: "none",
+                  borderBottom:
+                    activeTab === "report"
+                      ? "3px solid #2563eb"
+                      : "3px solid transparent",
+                  background: "transparent",
+                  color: activeTab === "report" ? "#1d4ed8" : "#475569",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Report
+              </button>
+            ) : (
+              ""
+            )}
           </div>
 
           {activeTab === "calendar" ? (
-          <div className={styles.WorkSchedule}>
-            {/* ✅ Employee Name field */}
-            <div className={styles.formGroup}>
-              <label htmlFor="employee">Employee Name&nbsp;</label>
-              <input
-                    id="employee"
-                    type="text"
-                    list={"employee-list"}
-                    placeholder="Employee No / Last Name"
-                    value={employeeInputValue}
-                    readOnly={(!canAdd && !canEdit) || (canAdd && !canEdit) || (!canAdd && canEdit)}
-                    onChange={(e) => {
-                      if ((!canAdd && !canEdit) || (canAdd && !canEdit) || (!canAdd && canEdit)) return;
-                      setEmployeeInputValue(e.target.value);
-                      const match = employees.find(
-                        (emp) =>
-                          `[${emp.employeeNo}] ${emp.fullName}`.toLowerCase() ===
-                          e.target.value.toLowerCase()
-                      );
-                      if (match) {
-                        setSelectedEmployee(match);
-                      } else {
-                        setSelectedEmployee(null);
-                      }
-                    }}
-                    className={styles.searchInput}
-                    style={{ width: "35%" }}
-                  />
-                  {(
-                    <datalist id="employee-list">
-                      {employees.map((emp) => (
-                        <option
-                          key={emp.employeeNo}
-                          value={`[${emp.employeeNo}] ${emp.fullName}`}
-                        />
-                      ))}
-                    </datalist>
-                  )}
-                  {(
-                    <datalist id="shift-list">
-                      {timeShift.map((shift) => (
-                        <option key={shift.tsCode} value={shift.tsCode}>
-                          {to12HourFormat(shift.timeIn) + "-"}
-                          {shift.breakOut != null
-                            ? to12HourFormat(shift.breakOut) + "/"
-                            : ""}
-                          {shift.breakIn != null
-                            ? to12HourFormat(shift.breakIn) + "-"
-                            : ""}
-                          {to12HourFormat(shift.timeOut)}
-                        </option>
-                      ))}
-                    </datalist>
-                  )}
-            </div>
-            {/* 🔻 Time Shift Legend with Tooltip */}
-            <div className={styles.legend}>
-              <h3>Legend</h3>
-              <div className={styles.legendGrid}>
-                {timeShift.map((shift) => (
-                  <div key={shift.tsCode} className={styles.legendItem}>
+            <div className={styles.WorkSchedule}>
+              {/* ✅ Employee Name field */}
+              <div className={styles.formGroup}>
+                <label htmlFor="employee">Employee Name&nbsp;</label>
+                <input
+                  id="employee"
+                  type="text"
+                  list={"employee-list"}
+                  placeholder="Employee No / Last Name"
+                  value={employeeInputValue}
+                  readOnly={
+                    (!canAdd && !canEdit) ||
+                    (canAdd && !canEdit) ||
+                    (!canAdd && canEdit)
+                  }
+                  onChange={(e) => {
+                    if (
+                      (!canAdd && !canEdit) ||
+                      (canAdd && !canEdit) ||
+                      (!canAdd && canEdit)
+                    )
+                      return;
+                    setEmployeeInputValue(e.target.value);
+                    const match = employees.find(
+                      (emp) =>
+                        `[${emp.employeeNo}] ${emp.fullName}`.toLowerCase() ===
+                        e.target.value.toLowerCase(),
+                    );
+                    if (match) {
+                      setSelectedEmployee(match);
+                    } else {
+                      setSelectedEmployee(null);
+                    }
+                  }}
+                  className={styles.searchInput}
+                  style={{ width: "35%" }}
+                />
+                {
+                  <datalist id="employee-list">
+                    {employees.map((emp) => (
+                      <option
+                        key={emp.employeeNo}
+                        value={`[${emp.employeeNo}] ${emp.fullName}`}
+                      />
+                    ))}
+                  </datalist>
+                }
+                {
+                  <datalist id="shift-list">
+                    {timeShift.map((shift) => (
+                      <option key={shift.tsCode} value={shift.tsCode}>
+                        {to12HourFormat(shift.timeIn) + "-"}
+                        {shift.breakOut != null
+                          ? to12HourFormat(shift.breakOut) + "/"
+                          : ""}
+                        {shift.breakIn != null
+                          ? to12HourFormat(shift.breakIn) + "-"
+                          : ""}
+                        {to12HourFormat(shift.timeOut)}
+                      </option>
+                    ))}
+                  </datalist>
+                }
+              </div>
+              {/* 🔻 Time Shift Legend with Tooltip */}
+              <div className={styles.legend}>
+                <h3>Legend</h3>
+                <div className={styles.legendGrid}>
+                  {timeShift.map((shift) => (
+                    <div key={shift.tsCode} className={styles.legendItem}>
+                      <span
+                        title={shift.tsName || ""}
+                        style={{
+                          cursor: "help",
+                          borderBottom: "1px dotted #888",
+                          padding: "2px 4px",
+                          borderRadius: "3px",
+                          background: "#f9f9f9",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {shift.tsCode}
+                      </span>
+                      {" – "}
+                      {to12HourFormat(shift.timeIn) + "-"}
+                      {shift.breakOut != null
+                        ? to12HourFormat(shift.breakOut) + "/"
+                        : ""}
+                      {shift.breakIn != null
+                        ? to12HourFormat(shift.breakIn) + "-"
+                        : ""}
+                      {to12HourFormat(shift.timeOut)}
+                    </div>
+                  ))}
+                </div>
+                <div className={styles.holidayLegendRow}>
+                  <div className={styles.holidayLegendItem}>
                     <span
-                      title={shift.tsName || ''}
-                      style={{
-                        cursor: 'help',
-                        borderBottom: '1px dotted #888',
-                        padding: '2px 4px',
-                        borderRadius: '3px',
-                        background: '#f9f9f9',
-                        fontWeight: 'bold',
-                      }}
-                    >
-                      {shift.tsCode}
-                    </span>
-                    {" – "}
-                    {to12HourFormat(shift.timeIn) + "-"}
-                    {shift.breakOut != null
-                      ? to12HourFormat(shift.breakOut) + "/"
-                      : ""}
-                    {shift.breakIn != null
-                      ? to12HourFormat(shift.breakIn) + "-"
-                      : ""}
-                    {to12HourFormat(shift.timeOut)}
+                      className={`${styles.holidayLegendSwatch} ${styles.holidayRegular}`}
+                      aria-hidden="true"
+                    />
+                    <span>Regular Holiday</span>
                   </div>
-                ))}
-              </div>
-              <div className={styles.holidayLegendRow}>
-                <div className={styles.holidayLegendItem}>
-                  <span
-                    className={`${styles.holidayLegendSwatch} ${styles.holidayRegular}`}
-                    aria-hidden="true"
-                  />
-                  <span>Regular Holiday</span>
-                </div>
-                <div className={styles.holidayLegendItem}>
-                  <span
-                    className={`${styles.holidayLegendSwatch} ${styles.holidaySpecial}`}
-                    aria-hidden="true"
-                  />
-                  <span>Special Holiday</span>
-                </div>
-                <div className={styles.holidayLegendItem}>
-                  <span
-                    className={`${styles.holidayLegendSwatch} ${styles.holidayWorking}`}
-                    aria-hidden="true"
-                  />
-                  <span>Working Holiday</span>
-                </div>
-                <div className={styles.holidayLegendItem}>
-                  <span
-                    className={`${styles.holidayLegendSwatch} ${styles.dayOffSwatch}`}
-                    aria-hidden="true"
-                  />
-                  <span>Day Off / Rest Day</span>
+                  <div className={styles.holidayLegendItem}>
+                    <span
+                      className={`${styles.holidayLegendSwatch} ${styles.holidaySpecial}`}
+                      aria-hidden="true"
+                    />
+                    <span>Special Holiday</span>
+                  </div>
+                  <div className={styles.holidayLegendItem}>
+                    <span
+                      className={`${styles.holidayLegendSwatch} ${styles.holidayWorking}`}
+                      aria-hidden="true"
+                    />
+                    <span>Working Holiday</span>
+                  </div>
+                  <div className={styles.holidayLegendItem}>
+                    <span
+                      className={`${styles.holidayLegendSwatch} ${styles.dayOffSwatch}`}
+                      aria-hidden="true"
+                    />
+                    <span>Day Off / Rest Day</span>
+                  </div>
                 </div>
               </div>
+              {canAdd && (
+                <div className={styles.autoFillContainer}>
+                  <button
+                    className={styles.autoFillButton}
+                    onClick={handleAutoFillDayOff}
+                    title="Bulk-add rest days for a selected month"
+                  >
+                    Auto-fill Rest Days
+                  </button>
+                </div>
+              )}
+              <FullCalendar
+                plugins={[dayGridPlugin, interactionPlugin]}
+                initialView="dayGridMonth"
+                headerToolbar={{
+                  left: "prev,next today",
+                  center: "title",
+                  right: "",
+                }}
+                events={[...workScheduleEvents, ...holidayEvents]}
+                dateClick={canAdd && canEdit ? handleDateClick : undefined}
+                eventClick={canAdd && canEdit ? handleEventClick : undefined} // ✅ Add this line
+                editable={false}
+                selectable={true}
+                height="auto"
+                eventContent={(arg) => {
+                  const eventType = arg.event.extendedProps?.eventType as
+                    | "holiday"
+                    | "workSchedule"
+                    | "dayOff"
+                    | undefined;
+
+                  if (eventType === "holiday") {
+                    return (
+                      <div>
+                        <strong>Holiday</strong>
+                        <div style={{ fontSize: "0.78em", lineHeight: "1.2" }}>
+                          {arg.event.title}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (eventType === "dayOff") {
+                    return (
+                      <div>
+                        <strong>Day Off</strong>
+                      </div>
+                    );
+                  }
+
+                  const shift = timeShift.find(
+                    (s) => s.tsCode === arg.event.title,
+                  );
+                  return (
+                    <div>
+                      <strong>{arg.event.title}</strong>
+                      {shift && (
+                        <div style={{ fontSize: "0.75em", lineHeight: "1.2" }}>
+                          <div>
+                            {to12HourFormat(shift.timeIn) + "-"}
+                            {shift.breakOut != null
+                              ? to12HourFormat(shift.breakOut)
+                              : ""}
+                          </div>
+                          <div>
+                            {shift.breakIn != null
+                              ? to12HourFormat(shift.breakIn) + "-"
+                              : ""}
+                            {to12HourFormat(shift.timeOut)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }}
+                datesSet={(arg) => {
+                  if (selectedEmployee) {
+                    // Use the midpoint of the visible range to reliably get
+                    // the displayed month (arg.start can be in the previous month
+                    // when the month doesn't start on Sunday, but equals the
+                    // 1st of the displayed month when it does — midpoint is always
+                    // inside the correct month).
+                    const midDate = new Date(
+                      (arg.start.getTime() + arg.end.getTime()) / 2,
+                    );
+                    const year = midDate.getFullYear();
+                    const month = midDate.getMonth() + 1;
+                    setCurrentCalendarDate(new Date(year, month - 1, 1));
+                    fetchAllWorkSchedule(
+                      selectedEmployee.employeeId,
+                      year,
+                      month,
+                    );
+                  }
+                }}
+              />
             </div>
-            {canAdd && (
-              <div className={styles.autoFillContainer}>
-                <button
-                  className={styles.autoFillButton}
-                  onClick={handleAutoFillDayOff}
-                  title="Bulk-add rest days for a selected month"
-                >
-                  Auto-fill Rest Days
-                </button>
-              </div>
-            )}
-            <FullCalendar
-              plugins={[dayGridPlugin, interactionPlugin]}
-              initialView="dayGridMonth"
-              headerToolbar={{
-                left: "prev,next today",
-                center: "title",
-                right: "",
-              }}
-              events={[...workScheduleEvents, ...holidayEvents]}
-              dateClick={canAdd && canEdit ? handleDateClick : undefined}
-              eventClick={canAdd && canEdit ? handleEventClick : undefined} // ✅ Add this line
-              editable={false}
-              selectable={true}
-              height="auto"
-              eventContent={(arg) => {
-                const eventType = arg.event.extendedProps?.eventType as
-                  | "holiday"
-                  | "workSchedule"
-                  | "dayOff"
-                  | undefined;
-
-                if (eventType === "holiday") {
-                  return (
-                    <div>
-                      <strong>Holiday</strong>
-                      <div style={{ fontSize: "0.78em", lineHeight: "1.2" }}>
-                        {arg.event.title}
-                      </div>
-                    </div>
-                  );
-                }
-
-                if (eventType === "dayOff") {
-                  return (
-                    <div>
-                      <strong>Day Off</strong>
-                    </div>
-                  );
-                }
-
-                const shift = timeShift.find(
-                  (s) => s.tsCode === arg.event.title
-                );
-                return (
-                  <div>
-                    <strong>{arg.event.title}</strong>
-                    {shift && (
-                      <div style={{ fontSize: "0.75em", lineHeight: "1.2" }}>
-                        <div>
-                          {to12HourFormat(shift.timeIn) + "-"}
-                          {shift.breakOut != null
-                            ? to12HourFormat(shift.breakOut)
-                            : ""}
-                        </div>
-                        <div>
-                          {shift.breakIn != null
-                            ? to12HourFormat(shift.breakIn) + "-"
-                            : ""}
-                          {to12HourFormat(shift.timeOut)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              }}
-              datesSet={(arg) => {
-                if (selectedEmployee) {
-                  // Use the midpoint of the visible range to reliably get
-                  // the displayed month (arg.start can be in the previous month
-                  // when the month doesn't start on Sunday, but equals the
-                  // 1st of the displayed month when it does — midpoint is always
-                  // inside the correct month).
-                  const midDate = new Date(
-                    (arg.start.getTime() + arg.end.getTime()) / 2
-                  );
-                  const year = midDate.getFullYear();
-                  const month = midDate.getMonth() + 1;
-                  setCurrentCalendarDate(new Date(year, month - 1, 1));
-                  fetchAllWorkSchedule(
-                    selectedEmployee.employeeId,
-                    year,
-                    month
-                  );
-                }
-              }}
-            />
-          </div>
           ) : (
             <div className={styles.WorkSchedule}>
               <div style={{ maxWidth: 720, display: "grid", gap: "1rem" }}>
-                <div style={{ padding: "1rem", border: "1px solid #dbe3ef", borderRadius: "0.75rem", background: "#f8fafc" }}>
-                  <h3 style={{ marginTop: 0, marginBottom: "0.75rem", color: "#1e3a8a" }}>Work Schedule Report</h3>
-                  <p style={{ marginTop: 0, color: "#64748b" }}>Generate work schedule report by Area, Business Unit, and date range.</p>
+                <div
+                  style={{
+                    padding: "1rem",
+                    border: "1px solid #dbe3ef",
+                    borderRadius: "0.75rem",
+                    background: "#f8fafc",
+                  }}
+                >
+                  <h3
+                    style={{
+                      marginTop: 0,
+                      marginBottom: "0.75rem",
+                      color: "#1e3a8a",
+                    }}
+                  >
+                    Work Schedule Report
+                  </h3>
+                  <p style={{ marginTop: 0, color: "#64748b" }}>
+                    Generate work schedule report by Area, Business Unit, and
+                    date range.
+                  </p>
 
                   <datalist id="report-employee-list">
                     {employees.map((employee) => (
-                      <option key={employee.employeeNo} value={toEmployeeOption(employee)} />
+                      <option
+                        key={employee.employeeNo}
+                        value={toEmployeeOption(employee)}
+                      />
                     ))}
                   </datalist>
 
@@ -1290,7 +1413,9 @@ export default function WorkSchedule() {
                       <select
                         value={reportAreaId}
                         onChange={(e) => {
-                          setReportAreaId(e.target.value ? Number(e.target.value) : "");
+                          setReportAreaId(
+                            e.target.value ? Number(e.target.value) : "",
+                          );
                           setReportBusinessUnitId("");
                         }}
                         className={styles.searchInput}
@@ -1309,49 +1434,90 @@ export default function WorkSchedule() {
                       <label>Business Unit</label>
                       <select
                         value={reportBusinessUnitId}
-                        onChange={(e) => setReportBusinessUnitId(e.target.value ? Number(e.target.value) : "")}
+                        onChange={(e) =>
+                          setReportBusinessUnitId(
+                            e.target.value ? Number(e.target.value) : "",
+                          )
+                        }
                         disabled={reportAreaId === ""}
                         className={styles.searchInput}
                         style={{ width: "100%" }}
                       >
                         <option value="">All Business Units</option>
                         {filteredReportBusinessUnits.map((unit) => (
-                          <option key={unit.businessUnitsId} value={unit.businessUnitsId}>
+                          <option
+                            key={unit.businessUnitsId}
+                            value={unit.businessUnitsId}
+                          >
                             {unit.businessUnitsName}
                           </option>
                         ))}
                       </select>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "0.75rem",
+                      }}
+                    >
                       <div className={styles.formGroup}>
                         <label>Date From</label>
                         <input
                           type="date"
                           value={reportFromDate}
-                          onChange={(e) => setReportFromDate(e.target.value)}
+                          onChange={(e) => {
+                            const newDateFrom = e.target.value;
+
+                            setReportFromDate(newDateFrom);
+
+                            // Clear Date To if it is earlier than the new Date From
+                            if (reportToDate && reportToDate < newDateFrom) {
+                              setReportToDate("");
+                            }
+                          }}
                           className={styles.searchInput}
                         />
                       </div>
+
                       <div className={styles.formGroup}>
                         <label>Date To</label>
                         <input
                           type="date"
                           value={reportToDate}
-                          onChange={(e) => setReportToDate(e.target.value)}
+                          min={reportFromDate || undefined}
+                          onChange={(e) => {
+                            const newDateTo = e.target.value;
+
+                            // Prevent Date To from being earlier than Date From
+                            if (reportFromDate && newDateTo < reportFromDate) {
+                              return;
+                            }
+
+                            setReportToDate(newDateTo);
+                          }}
                           className={styles.searchInput}
                         />
                       </div>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "0.75rem",
+                      }}
+                    >
                       <div className={styles.formGroup}>
                         <label>Prepared By</label>
                         <input
                           type="text"
                           list="report-employee-list"
                           value={reportPreparedBy}
-                          onChange={(e) => { void handlePreparedByChange(e.target.value); }}
+                          onChange={(e) => {
+                            void handlePreparedByChange(e.target.value);
+                          }}
                           placeholder="Employee No / Last Name"
                           className={styles.searchInput}
                         />
@@ -1362,7 +1528,9 @@ export default function WorkSchedule() {
                           type="text"
                           list="report-employee-list"
                           value={reportApprovedBy}
-                          onChange={(e) => { void handleApprovedByChange(e.target.value); }}
+                          onChange={(e) => {
+                            void handleApprovedByChange(e.target.value);
+                          }}
                           placeholder="Employee No / Last Name"
                           className={styles.searchInput}
                         />
@@ -1376,7 +1544,9 @@ export default function WorkSchedule() {
                         disabled={isGeneratingReport}
                         className={styles.autoFillButton}
                       >
-                        {isGeneratingReport ? "Generating..." : "Generate Report"}
+                        {isGeneratingReport
+                          ? "Generating..."
+                          : "Generate Report"}
                       </button>
                     </div>
                   </div>

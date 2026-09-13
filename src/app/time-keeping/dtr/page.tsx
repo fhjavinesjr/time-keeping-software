@@ -10,18 +10,12 @@ import modalStyles from "@/styles/Modal.module.scss";
 import { fetchWithAuth } from "@/lib/utils/fetchWithAuth";
 import useSalaryPeriodRange from "@/lib/utils/useSalaryPeriodRange";
 import Swal from "sweetalert2";
-import {
-  toDateInputValue,
-  toCustomFormat,
-} from "@/lib/utils/dateFormatUtils";
+import { toDateInputValue, toCustomFormat } from "@/lib/utils/dateFormatUtils";
 import { localStorageUtil } from "@/lib/utils/localStorageUtil";
 import { Employee } from "@/lib/types/Employee";
-const API_BASE_URL_TIMEKEEPING =
-  runtimeConfig.getApiUrl("timekeeping");
-const API_BASE_URL_ADMINISTRATIVE =
-  runtimeConfig.getApiUrl("administrative");
-const API_BASE_URL_HRM =
-  runtimeConfig.getApiUrl("hrm");
+const API_BASE_URL_TIMEKEEPING = runtimeConfig.getApiUrl("timekeeping");
+const API_BASE_URL_ADMINISTRATIVE = runtimeConfig.getApiUrl("administrative");
+const API_BASE_URL_HRM = runtimeConfig.getApiUrl("hrm");
 
 type DTRSegmentDTO = {
   dtrSegmentId: number;
@@ -84,8 +78,8 @@ type WorkScheduleEntryDTO = {
 type LeaveApplicationDTO = {
   leaveApplicationId: number;
   leaveType: string;
-  startDate: string | null;  // yyyy-MM-dd
-  endDate: string | null;    // yyyy-MM-dd
+  startDate: string | null; // yyyy-MM-dd
+  endDate: string | null; // yyyy-MM-dd
   approvedStatus: string;
 };
 
@@ -99,11 +93,11 @@ type CompensatoryTimeOffDTO = {
 // Pass Slip — only fields needed for DTR overlay.
 type PassSlipDTO = {
   passSlipId: number;
-  dateFiled: string;      // yyyy-MM-dd — when the slip was filed
-  passSlipDate: string;   // yyyy-MM-dd — actual date the pass slip covers (used for DTR match)
-  purpose: string;        // "Personal" | "Official"
-  departureTime: string;  // HH:mm:ss
-  arrivalTime: string;    // HH:mm:ss
+  dateFiled: string; // yyyy-MM-dd — when the slip was filed
+  passSlipDate: string; // yyyy-MM-dd — actual date the pass slip covers (used for DTR match)
+  purpose: string; // "Personal" | "Official"
+  departureTime: string; // HH:mm:ss
+  arrivalTime: string; // HH:mm:ss
   status: string;
 };
 
@@ -111,10 +105,10 @@ type PassSlipDTO = {
 type OfficialEngagementApplicationDTO = {
   officialEngagementApplicationId: number;
   officialType: string; // "Official Business" | "Official Time"
-  startDate: string;    // yyyy-MM-dd
-  startTime: string;    // HH:mm:ss
-  endDate: string;      // yyyy-MM-dd
-  endTime: string;      // HH:mm:ss
+  startDate: string; // yyyy-MM-dd
+  startTime: string; // HH:mm:ss
+  endDate: string; // yyyy-MM-dd
+  endTime: string; // HH:mm:ss
   status: string;
 };
 
@@ -133,17 +127,35 @@ type TimeCorrectionDTO = {
 type ScheduledTimes = {
   tsCode: string;
   tsName: string;
-  timeIn: string;           // HH:mm:ss
-  breakOut: string | null;  // HH:mm:ss or null
-  breakIn: string | null;   // HH:mm:ss or null
-  timeOut: string;          // HH:mm:ss
+  timeIn: string; // HH:mm:ss
+  breakOut: string | null; // HH:mm:ss or null
+  breakIn: string | null; // HH:mm:ss or null
+  timeOut: string; // HH:mm:ss
 };
 
 // Detail data surfaced for overlay-status rows (Pass Slip, Time Corrected, OE).
 type OverlayDetail =
-  | { kind: "PASS_SLIP"; purpose: string; departureTime: string; arrivalTime: string }
-  | { kind: "TIME_CORRECTED"; correctedTimeIn: string; correctedTimeOut: string; correctedBreakOut?: string | null; correctedBreakIn?: string | null }
-  | { kind: "OFFICIAL_ENGAGEMENT"; officialType: string; startDate: string; startTime: string; endDate: string; endTime: string };
+  | {
+      kind: "PASS_SLIP";
+      purpose: string;
+      departureTime: string;
+      arrivalTime: string;
+    }
+  | {
+      kind: "TIME_CORRECTED";
+      correctedTimeIn: string;
+      correctedTimeOut: string;
+      correctedBreakOut?: string | null;
+      correctedBreakIn?: string | null;
+    }
+  | {
+      kind: "OFFICIAL_ENGAGEMENT";
+      officialType: string;
+      startDate: string;
+      startTime: string;
+      endDate: string;
+      endTime: string;
+    };
 
 const toIsoDateKey = (customDate: string): string => {
   const [month, day, year] = customDate.split(" ")[0].split("-");
@@ -172,10 +184,9 @@ const getDateKeysInRange = (fromCustom: string, toCustom: string): string[] => {
   const cursor = new Date(from);
 
   while (cursor <= to) {
-    const isoDate = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(
-      2,
-      "0"
-    )}-${String(cursor.getDate()).padStart(2, "0")}`;
+    const isoDate = `${cursor.getFullYear()}-${String(
+      cursor.getMonth() + 1,
+    ).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
     dateKeys.push(isoDate);
     cursor.setDate(cursor.getDate() + 1);
   }
@@ -210,7 +221,7 @@ const buildDTRWithMissingDates = (
   dayOffSet: Set<string>,
   fromCustom: string,
   toCustom: string,
-  employeeId?: string
+  employeeId?: string,
 ): DTRDailyDTO[] => {
   const dateKeys = getDateKeysInRange(fromCustom, toCustom);
 
@@ -278,18 +289,25 @@ const toIsoDateParam = (customDate: string): string => {
 
 export default function DTRPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
+    null,
+  );
   const [records, setRecords] = useState<DTRDailyDTO[]>([]);
   const { fromDate, setFromDate, toDate, setToDate } = useSalaryPeriodRange(
     API_BASE_URL_ADMINISTRATIVE ?? "",
-    "PAYROLL"
+    "PAYROLL",
   );
   const [userRole, setUserRole] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [holidays, setHolidays] = useState<HolidayDTO[]>([]);
-  const [scheduleMap, setScheduleMap] = useState<Map<string, ScheduledTimes[]>>(new Map());
-  const [overlayDetailMap, setOverlayDetailMap] = useState<Map<string, OverlayDetail>>(new Map());
-  const [editSegmentState, setEditSegmentState] = useState<EditSegmentState | null>(null);
+  const [scheduleMap, setScheduleMap] = useState<Map<string, ScheduledTimes[]>>(
+    new Map(),
+  );
+  const [overlayDetailMap, setOverlayDetailMap] = useState<
+    Map<string, OverlayDetail>
+  >(new Map());
+  const [editSegmentState, setEditSegmentState] =
+    useState<EditSegmentState | null>(null);
   const [isSavingSegment, setIsSavingSegment] = useState(false);
   const [dayOffDates, setDayOffDates] = useState<Set<string>>(new Set());
   const canAdd = localStorageUtil.canAdd("tk.dtr");
@@ -317,14 +335,22 @@ export default function DTRPage() {
     setUserRole(role);
 
     // check permission
-    if (empNo && ((!canAdd && !canEdit) || (canAdd && !canEdit) || (!canAdd && canEdit))) {
+    if (
+      empNo &&
+      ((!canAdd && !canEdit) || (canAdd && !canEdit) || (!canAdd && canEdit))
+    ) {
       const storedList = localStorageUtil.getEmployees();
-      const empFromList = storedList?.find(e => e.employeeNo === empNo) ?? null;
+      const empFromList =
+        storedList?.find((e) => e.employeeNo === empNo) ?? null;
       if (empFromList) {
         setSelectedEmployee(empFromList);
         setInputValue(`[${empFromList.employeeNo}] ${empFromList.fullName}`);
       } else if (fullname) {
-        const emp = { employeeId: employeeId, employeeNo: empNo, fullName: fullname } as Employee;
+        const emp = {
+          employeeId: employeeId,
+          employeeNo: empNo,
+          fullName: fullname,
+        } as Employee;
         setSelectedEmployee(emp);
         setInputValue(`[${empNo}] ${fullname}`);
       }
@@ -335,7 +361,7 @@ export default function DTRPage() {
   const fetchEmployees = async () => {
     try {
       const res = await fetchWithAuth(
-        `${API_BASE_URL_TIMEKEEPING}/api/employees/basicInfo`
+        `${API_BASE_URL_TIMEKEEPING}/api/employees/basicInfo`,
       );
 
       if (!res.ok) {
@@ -354,10 +380,12 @@ export default function DTRPage() {
 
   // Fetch approved regular leave applications for an employee and build a
   // date → leaveType map.  Leave Monetization is excluded (no date range).
-  const fetchLeaveMap = async (employeeId: string): Promise<Map<string, string>> => {
+  const fetchLeaveMap = async (
+    employeeId: string,
+  ): Promise<Map<string, string>> => {
     try {
       const res = await fetchWithAuth(
-        `${API_BASE_URL_HRM}/api/leave-application/get-all/${employeeId}`
+        `${API_BASE_URL_HRM}/api/leave-application/get-all/${employeeId}`,
       );
       if (!res.ok || res.status === 204) return new Map();
 
@@ -370,11 +398,12 @@ export default function DTRPage() {
           leave.approvedStatus?.toLowerCase() !== "approved" ||
           !leave.startDate ||
           !leave.endDate
-        ) return;
+        )
+          return;
 
         // Expand every day in the inclusive date range
         const cursor = new Date(leave.startDate);
-        const end    = new Date(leave.endDate);
+        const end = new Date(leave.endDate);
         while (cursor <= end) {
           const key = cursor.toISOString().split("T")[0]; // yyyy-MM-dd
           map.set(key, leave.leaveType);
@@ -394,7 +423,7 @@ export default function DTRPage() {
   // attendance event with an inclusive work-date range.
   const overlayLeaves = (
     rows: DTRDailyDTO[],
-    leaveDateMap: Map<string, string>
+    leaveDateMap: Map<string, string>,
   ): DTRDailyDTO[] => {
     if (leaveDateMap.size === 0) return rows;
     return rows.map((rec) => {
@@ -408,7 +437,7 @@ export default function DTRPage() {
   const fetchCtoSet = async (employeeId: string): Promise<Set<string>> => {
     try {
       const res = await fetchWithAuth(
-        `${API_BASE_URL_HRM}/api/cto/get-all/${employeeId}`
+        `${API_BASE_URL_HRM}/api/cto/get-all/${employeeId}`,
       );
       if (!res.ok || res.status === 204) return new Set();
       const data: CompensatoryTimeOffDTO[] = await res.json();
@@ -427,20 +456,24 @@ export default function DTRPage() {
   // Approved CTO remains authoritative even when biometric punches exist.
   const overlayCtos = (
     rows: DTRDailyDTO[],
-    ctoDateSet: Set<string>
+    ctoDateSet: Set<string>,
   ): DTRDailyDTO[] => {
     if (ctoDateSet.size === 0) return rows;
     return rows.map((rec) => {
       const dateKey = toIsoDateKey(rec.workDate);
-      return ctoDateSet.has(dateKey) ? { ...rec, attendanceStatus: "CTO" } : rec;
+      return ctoDateSet.has(dateKey)
+        ? { ...rec, attendanceStatus: "CTO" }
+        : rec;
     });
   };
 
   // Fetch approved Pass Slips and return a Map<date, OverlayDetail> keyed by passSlipDate.
-  const fetchPassSlipDetailMap = async (employeeId: string): Promise<Map<string, OverlayDetail>> => {
+  const fetchPassSlipDetailMap = async (
+    employeeId: string,
+  ): Promise<Map<string, OverlayDetail>> => {
     try {
       const res = await fetchWithAuth(
-        `${API_BASE_URL_HRM}/api/pass-slip/get-all/${employeeId}`
+        `${API_BASE_URL_HRM}/api/pass-slip/get-all/${employeeId}`,
       );
       if (!res.ok || res.status === 204) return new Map();
       const data: PassSlipDTO[] = await res.json();
@@ -465,7 +498,7 @@ export default function DTRPage() {
   // but it is not hidden merely because Search created a Present transaction.
   const overlayPassSlips = (
     rows: DTRDailyDTO[],
-    passSlipDetailMap: Map<string, OverlayDetail>
+    passSlipDetailMap: Map<string, OverlayDetail>,
   ): DTRDailyDTO[] => {
     if (passSlipDetailMap.size === 0) return rows;
     return rows.map((rec) => {
@@ -480,11 +513,11 @@ export default function DTRPage() {
   // Fetch approved Official Engagement Applications and build a Map<date, OverlayDetail>
   // by expanding each OE's [startDate, endDate] range into individual date keys.
   const fetchOEDetailMap = async (
-    employeeId: string
+    employeeId: string,
   ): Promise<Map<string, OverlayDetail>> => {
     try {
       const res = await fetchWithAuth(
-        `${API_BASE_URL_HRM}/api/official-engagement/get-all/${employeeId}`
+        `${API_BASE_URL_HRM}/api/official-engagement/get-all/${employeeId}`,
       );
       if (!res.ok || res.status === 204) return new Map();
       const data: OfficialEngagementApplicationDTO[] = await res.json();
@@ -518,7 +551,7 @@ export default function DTRPage() {
   // Preserve the existing request priority of CTO and Pass Slip.
   const overlayOfficialEngagements = (
     rows: DTRDailyDTO[],
-    oeDetailMap: Map<string, OverlayDetail>
+    oeDetailMap: Map<string, OverlayDetail>,
   ): DTRDailyDTO[] => {
     if (oeDetailMap.size === 0) return rows;
     return rows.map((rec) => {
@@ -533,10 +566,12 @@ export default function DTRPage() {
   };
 
   // Fetch approved Time Corrections and return a Map<date, OverlayDetail> keyed by workDate.
-  const fetchTCDetailMap = async (employeeId: string): Promise<Map<string, OverlayDetail>> => {
+  const fetchTCDetailMap = async (
+    employeeId: string,
+  ): Promise<Map<string, OverlayDetail>> => {
     try {
       const res = await fetchWithAuth(
-        `${API_BASE_URL_HRM}/api/time-correction/get-all/${employeeId}`
+        `${API_BASE_URL_HRM}/api/time-correction/get-all/${employeeId}`,
       );
       if (!res.ok || res.status === 204) return new Map();
       const data: TimeCorrectionDTO[] = await res.json();
@@ -564,7 +599,7 @@ export default function DTRPage() {
   const overlayTimeCorrections = (
     rows: DTRDailyDTO[],
     tcDetailMap: Map<string, OverlayDetail>,
-    scheduledTimesMap: Map<string, ScheduledTimes[]>
+    scheduledTimesMap: Map<string, ScheduledTimes[]>,
   ): DTRDailyDTO[] => {
     if (tcDetailMap.size === 0) return rows;
     return rows.map((rec) => {
@@ -607,7 +642,12 @@ export default function DTRPage() {
           totalUndertimeMinutes = Math.max(0, schedOut - tcOut);
 
           // Break-related late/undertime — only when both corrected AND scheduled break exist
-          if (detail.correctedBreakOut && detail.correctedBreakIn && scheduled.breakOut && scheduled.breakIn) {
+          if (
+            detail.correctedBreakOut &&
+            detail.correctedBreakIn &&
+            scheduled.breakOut &&
+            scheduled.breakIn
+          ) {
             const tcBO = timeToMinutes(detail.correctedBreakOut);
             const tcBI = timeToMinutes(detail.correctedBreakIn);
             const schedBO = timeToMinutes(scheduled.breakOut);
@@ -653,7 +693,7 @@ export default function DTRPage() {
     try {
       if (selectedEmployee && fromDate && toDate) {
         const dtrQuery = `employeeId=${selectedEmployee.employeeId}&fromDate=${encodeURIComponent(
-          fromDate
+          fromDate,
         )}&toDate=${encodeURIComponent(toDate)}`;
         const dtrUrl = reconcileAdms
           ? `${API_BASE_URL_TIMEKEEPING}/api/dtr-daily/reconcile?${dtrQuery}`
@@ -661,7 +701,7 @@ export default function DTRPage() {
 
         const res = await fetchWithAuth(
           dtrUrl,
-          reconcileAdms ? { method: "POST" } : undefined
+          reconcileAdms ? { method: "POST" } : undefined,
         );
 
         if (res.status === 204) {
@@ -684,7 +724,7 @@ export default function DTRPage() {
             });
           const [wsRes, tsMap] = await Promise.all([
             fetchWithAuth(
-              `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule?employeeId=${selectedEmployee.employeeId}&monthStart=${encodeURIComponent(fromDate)}&monthEnd=${encodeURIComponent(toDate)}`
+              `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule?employeeId=${selectedEmployee.employeeId}&monthStart=${encodeURIComponent(fromDate)}&monthEnd=${encodeURIComponent(toDate)}`,
             ),
             fetchTimeShifts(),
           ]);
@@ -707,32 +747,51 @@ export default function DTRPage() {
           }
           setScheduleMap(scheduledTimesMap204);
           setDayOffDates(new Set(dayOffSet));
-          const [leaveMap204, ctoSet204, passSlipDetailMap204, oeDetailMap204, tcDetailMap204] = await Promise.all([
+          const [
+            leaveMap204,
+            ctoSet204,
+            passSlipDetailMap204,
+            oeDetailMap204,
+            tcDetailMap204,
+          ] = await Promise.all([
             fetchLeaveMap(selectedEmployee.employeeId),
             fetchCtoSet(selectedEmployee.employeeId),
             fetchPassSlipDetailMap(selectedEmployee.employeeId),
             fetchOEDetailMap(selectedEmployee.employeeId),
             fetchTCDetailMap(selectedEmployee.employeeId),
           ]);
-          setOverlayDetailMap(new Map<string, OverlayDetail>([...passSlipDetailMap204, ...oeDetailMap204, ...tcDetailMap204]));
+          setOverlayDetailMap(
+            new Map<string, OverlayDetail>([
+              ...passSlipDetailMap204,
+              ...oeDetailMap204,
+              ...tcDetailMap204,
+            ]),
+          );
           setRecords(
             overlayTimeCorrections(
               overlayOfficialEngagements(
                 overlayPassSlips(
                   overlayCtos(
                     overlayLeaves(
-                      buildDTRWithMissingDates([], holidayMap, dayOffSet, fromDate, toDate, selectedEmployee.employeeId),
-                      leaveMap204
+                      buildDTRWithMissingDates(
+                        [],
+                        holidayMap,
+                        dayOffSet,
+                        fromDate,
+                        toDate,
+                        selectedEmployee.employeeId,
+                      ),
+                      leaveMap204,
                     ),
-                    ctoSet204
+                    ctoSet204,
                   ),
-                  passSlipDetailMap204
+                  passSlipDetailMap204,
                 ),
-                oeDetailMap204
+                oeDetailMap204,
               ),
               tcDetailMap204,
-              scheduledTimesMap204
-            )
+              scheduledTimesMap204,
+            ),
           );
           return;
         }
@@ -763,7 +822,7 @@ export default function DTRPage() {
         // Fetch work schedules (day off detection + scheduled times) and time shifts in parallel
         const [wsRes, tsMap] = await Promise.all([
           fetchWithAuth(
-            `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule?employeeId=${selectedEmployee.employeeId}&monthStart=${encodeURIComponent(fromDate)}&monthEnd=${encodeURIComponent(toDate)}`
+            `${API_BASE_URL_TIMEKEEPING}/api/getListByEmployeeAndDateRange/work-schedule?employeeId=${selectedEmployee.employeeId}&monthStart=${encodeURIComponent(fromDate)}&monthEnd=${encodeURIComponent(toDate)}`,
           ),
           fetchTimeShifts(),
         ]);
@@ -787,14 +846,21 @@ export default function DTRPage() {
         setScheduleMap(scheduledTimesMap);
         setDayOffDates(new Set(dayOffSet));
 
-        const [leaveMap, ctoSet, passSlipDetailMap, oeDetailMap, tcDetailMap] = await Promise.all([
-          fetchLeaveMap(selectedEmployee.employeeId),
-          fetchCtoSet(selectedEmployee.employeeId),
-          fetchPassSlipDetailMap(selectedEmployee.employeeId),
-          fetchOEDetailMap(selectedEmployee.employeeId),
-          fetchTCDetailMap(selectedEmployee.employeeId),
-        ]);
-        setOverlayDetailMap(new Map<string, OverlayDetail>([...passSlipDetailMap, ...oeDetailMap, ...tcDetailMap]));
+        const [leaveMap, ctoSet, passSlipDetailMap, oeDetailMap, tcDetailMap] =
+          await Promise.all([
+            fetchLeaveMap(selectedEmployee.employeeId),
+            fetchCtoSet(selectedEmployee.employeeId),
+            fetchPassSlipDetailMap(selectedEmployee.employeeId),
+            fetchOEDetailMap(selectedEmployee.employeeId),
+            fetchTCDetailMap(selectedEmployee.employeeId),
+          ]);
+        setOverlayDetailMap(
+          new Map<string, OverlayDetail>([
+            ...passSlipDetailMap,
+            ...oeDetailMap,
+            ...tcDetailMap,
+          ]),
+        );
         const recordsWithFilledDates = overlayTimeCorrections(
           overlayOfficialEngagements(
             overlayPassSlips(
@@ -806,18 +872,18 @@ export default function DTRPage() {
                     dayOffSet,
                     fromDate,
                     toDate,
-                    selectedEmployee.employeeId
+                    selectedEmployee.employeeId,
                   ),
-                  leaveMap
+                  leaveMap,
                 ),
-                ctoSet
+                ctoSet,
               ),
-              passSlipDetailMap
+              passSlipDetailMap,
             ),
-            oeDetailMap
+            oeDetailMap,
           ),
           tcDetailMap,
-          scheduledTimesMap
+          scheduledTimesMap,
         );
 
         setRecords(recordsWithFilledDates);
@@ -834,7 +900,7 @@ export default function DTRPage() {
   const fetchHolidays = async () => {
     try {
       const res = await fetchWithAuth(
-        `${API_BASE_URL_ADMINISTRATIVE}/api/holiday/get-all`
+        `${API_BASE_URL_ADMINISTRATIVE}/api/holiday/get-all`,
       );
 
       if (!res.ok) {
@@ -852,9 +918,18 @@ export default function DTRPage() {
   // Fetch all configured time shifts from Administrative and return a Map<tsCode, ScheduledTimes>.
   const fetchTimeShifts = async (): Promise<Map<string, ScheduledTimes>> => {
     try {
-      const res = await fetchWithAuth(`${API_BASE_URL_ADMINISTRATIVE}/api/getAll/time-shift`);
+      const res = await fetchWithAuth(
+        `${API_BASE_URL_ADMINISTRATIVE}/api/getAll/time-shift`,
+      );
       if (!res.ok || res.status === 204) return new Map();
-      const data: Array<{ tsCode: string; tsName: string; timeIn: string; breakOut: string | null; breakIn: string | null; timeOut: string }> = await res.json();
+      const data: Array<{
+        tsCode: string;
+        tsName: string;
+        timeIn: string;
+        breakOut: string | null;
+        breakIn: string | null;
+        timeOut: string;
+      }> = await res.json();
       const map = new Map<string, ScheduledTimes>();
       data.forEach((ts) =>
         map.set(ts.tsCode, {
@@ -864,7 +939,7 @@ export default function DTRPage() {
           breakOut: ts.breakOut,
           breakIn: ts.breakIn,
           timeOut: ts.timeOut,
-        })
+        }),
       );
       return map;
     } catch {
@@ -892,7 +967,11 @@ export default function DTRPage() {
       return;
     }
     if (!segment.dtrSegmentId) {
-      Swal.fire("Validation Error", "This segment has no valid transaction ID.", "warning");
+      Swal.fire(
+        "Validation Error",
+        "This segment has no valid transaction ID.",
+        "warning",
+      );
       return;
     }
     if (breakIn && !breakOut) {
@@ -903,7 +982,7 @@ export default function DTRPage() {
       Swal.fire(
         "Validation Error",
         "A completed segment must contain both Break Out and Break In, or neither.",
-        "warning"
+        "warning",
       );
       return;
     }
@@ -921,7 +1000,7 @@ export default function DTRPage() {
             breakIn: breakIn ? toTimeStr(breakIn) : null,
             timeOut: timeOut ? toTimeStr(timeOut) : null,
           }),
-        }
+        },
       );
 
       if (!res.ok) {
@@ -942,16 +1021,20 @@ export default function DTRPage() {
       // an administrator correction.
       await fetchDTR(false);
     } catch (error) {
-      const message = error instanceof Error && error.message
-        ? error.message
-        : "Failed to update segment.";
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Failed to update segment.";
       Swal.fire("Error", message, "error");
     } finally {
       setIsSavingSegment(false);
     }
   };
 
-  const handleDeleteSegment = async (record: DTRDailyDTO, segment: DTRSegmentDTO) => {
+  const handleDeleteSegment = async (
+    record: DTRDailyDTO,
+    segment: DTRSegmentDTO,
+  ) => {
     const confirm = await Swal.fire({
       title: "Delete DTR Transaction?",
       text: `Remove segment ${segment.segmentNo} from ${record.workDate.split(" ")[0]}? It will remain deleted until Search is clicked again.`,
@@ -964,14 +1047,18 @@ export default function DTRPage() {
     if (!confirm.isConfirmed) return;
 
     if (!segment.dtrSegmentId) {
-      await Swal.fire("Error", "This DTR segment has no valid transaction ID.", "error");
+      await Swal.fire(
+        "Error",
+        "This DTR segment has no valid transaction ID.",
+        "error",
+      );
       return;
     }
 
     try {
       const res = await fetchWithAuth(
         `${API_BASE_URL_TIMEKEEPING}/api/dtr-daily/segment/${segment.dtrSegmentId}`,
-        { method: "DELETE" }
+        { method: "DELETE" },
       );
       if (!res.ok) throw new Error(`Failed: ${res.status}`);
 
@@ -1005,7 +1092,7 @@ export default function DTRPage() {
       const fromIso = toIsoDateParam(fromDate);
       const toIso = toIsoDateParam(toDate);
       const url = `${API_BASE_URL_TIMEKEEPING}/api/dtr-daily/report?employeeId=${encodeURIComponent(
-        selectedEmployee.employeeId
+        selectedEmployee.employeeId,
       )}&fromDate=${encodeURIComponent(fromIso)}&toDate=${encodeURIComponent(toIso)}`;
 
       const response = await fetchWithAuth(url);
@@ -1045,7 +1132,8 @@ export default function DTRPage() {
                     fontSize: "0.85rem",
                     fontWeight: 600,
                     padding: "0.4rem 1rem",
-                    background: "linear-gradient(120deg, #4c5fb8 0%, #2f87d4 100%)",
+                    background:
+                      "linear-gradient(120deg, #4c5fb8 0%, #2f87d4 100%)",
                     color: "#fff",
                     borderRadius: "8px",
                     textDecoration: "none",
@@ -1071,14 +1159,23 @@ export default function DTRPage() {
                       list={"employee-list"}
                       placeholder="Employee No / Lastname"
                       value={inputValue}
-                      readOnly={(!canAdd && !canEdit) || (canAdd && !canEdit) || (!canAdd && canEdit)} // ✅ Non-admin can't edit
+                      readOnly={
+                        (!canAdd && !canEdit) ||
+                        (canAdd && !canEdit) ||
+                        (!canAdd && canEdit)
+                      } // ✅ Non-admin can't edit
                       onChange={(e) => {
-                        if ((!canAdd && !canEdit) || (canAdd && !canEdit) || (!canAdd && canEdit)) return;
+                        if (
+                          (!canAdd && !canEdit) ||
+                          (canAdd && !canEdit) ||
+                          (!canAdd && canEdit)
+                        )
+                          return;
                         setInputValue(e.target.value);
                         const match = employees.find(
                           (emp) =>
                             `[${emp.employeeNo}] ${emp.fullName}`.toLowerCase() ===
-                            e.target.value.toLowerCase()
+                            e.target.value.toLowerCase(),
                         );
                         if (match) {
                           setSelectedEmployee(match);
@@ -1087,7 +1184,7 @@ export default function DTRPage() {
                         }
                       }}
                     />
-                    {(
+                    {
                       <datalist id="employee-list">
                         {employees.map((emp) => (
                           <option
@@ -1096,7 +1193,7 @@ export default function DTRPage() {
                           />
                         ))}
                       </datalist>
-                    )}
+                    }
                   </div>
 
                   <div className={styles.formGroup}>
@@ -1105,9 +1202,22 @@ export default function DTRPage() {
                       id="from"
                       type="date"
                       value={fromDate ? toDateInputValue(fromDate) : ""}
-                      onChange={(e) =>
-                        setFromDate(toCustomFormat(e.target.value, true))
-                      }
+                      onChange={(e) => {
+                        const newFromDate = e.target.value;
+
+                        setFromDate(
+                          newFromDate ? toCustomFormat(newFromDate, true) : "",
+                        );
+
+                        // If existing To Date is now invalid, clear it
+                        if (
+                          toDate &&
+                          newFromDate &&
+                          toDateInputValue(toDate) < newFromDate
+                        ) {
+                          setToDate("");
+                        }
+                      }}
                     />
                   </div>
 
@@ -1117,14 +1227,30 @@ export default function DTRPage() {
                       id="to"
                       type="date"
                       value={toDate ? toDateInputValue(toDate) : ""}
-                      onChange={(e) =>
-                        setToDate(toCustomFormat(e.target.value, false))
-                      }
+                      min={fromDate ? toDateInputValue(fromDate) : undefined}
+                      onChange={(e) => {
+                        const newToDate = e.target.value;
+
+                        if (
+                          fromDate &&
+                          newToDate &&
+                          newToDate < toDateInputValue(fromDate)
+                        ) {
+                          return;
+                        }
+
+                        setToDate(
+                          newToDate ? toCustomFormat(newToDate, false) : "",
+                        );
+                      }}
                     />
                   </div>
 
                   <div className={styles.actions}>
-                    <button className={styles.searchButton} onClick={() => fetchDTR(true)}>
+                    <button
+                      className={styles.searchButton}
+                      onClick={() => fetchDTR(true)}
+                    >
                       Search
                     </button>
                     <button
@@ -1160,23 +1286,48 @@ export default function DTRPage() {
       {editSegmentState && (
         <div
           style={{
-            position: "fixed", inset: 0, zIndex: 9999,
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
             background: "rgba(0,0,0,0.45)",
-            display: "flex", alignItems: "center", justifyContent: "center",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
-          onClick={(e) => { if (e.target === e.currentTarget && !isSavingSegment) setEditSegmentState(null); }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isSavingSegment)
+              setEditSegmentState(null);
+          }}
         >
           <div
             style={{
-              background: "#fff", borderRadius: 14,
-              padding: "2rem 2.2rem", minWidth: 360, maxWidth: 480, width: "100%",
+              background: "#fff",
+              borderRadius: 14,
+              padding: "2rem 2.2rem",
+              minWidth: 360,
+              maxWidth: 480,
+              width: "100%",
               boxShadow: "0 12px 40px rgba(30,60,120,0.18)",
             }}
           >
-            <h3 style={{ margin: "0 0 1.2rem", fontSize: "1.1rem", fontWeight: 700, color: "#243058" }}>
-              Edit Segment {editSegmentState.segment.segmentNo} — {editSegmentState.record.workDate.split(" ")[0]}
+            <h3
+              style={{
+                margin: "0 0 1.2rem",
+                fontSize: "1.1rem",
+                fontWeight: 700,
+                color: "#243058",
+              }}
+            >
+              Edit Segment {editSegmentState.segment.segmentNo} —{" "}
+              {editSegmentState.record.workDate.split(" ")[0]}
             </h3>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.9rem 1.2rem" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "0.9rem 1.2rem",
+              }}
+            >
               {(
                 [
                   { label: "Time In *", key: "timeIn" as const },
@@ -1185,32 +1336,63 @@ export default function DTRPage() {
                   { label: "Break In", key: "breakIn" as const },
                 ] as const
               ).map(({ label, key }) => (
-                <div key={key} style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-                  <label style={{ fontSize: "0.82rem", fontWeight: 600, color: "#445180" }}>{label}</label>
+                <div
+                  key={key}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.3rem",
+                  }}
+                >
+                  <label
+                    style={{
+                      fontSize: "0.82rem",
+                      fontWeight: 600,
+                      color: "#445180",
+                    }}
+                  >
+                    {label}
+                  </label>
                   <input
                     type="time"
                     value={editSegmentState[key]}
                     disabled={isSavingSegment}
                     onChange={(e) =>
-                      setEditSegmentState((prev) => prev ? { ...prev, [key]: e.target.value } : prev)
+                      setEditSegmentState((prev) =>
+                        prev ? { ...prev, [key]: e.target.value } : prev,
+                      )
                     }
                     style={{
-                      padding: "0.45rem 0.6rem", borderRadius: 7,
-                      border: "1px solid #c5cfe8", fontSize: "0.95rem",
+                      padding: "0.45rem 0.6rem",
+                      borderRadius: 7,
+                      border: "1px solid #c5cfe8",
+                      fontSize: "0.95rem",
                       background: isSavingSegment ? "#f3f4f6" : "#fff",
                     }}
                   />
                 </div>
               ))}
             </div>
-            <div style={{ display: "flex", gap: "0.8rem", justifyContent: "flex-end", marginTop: "1.5rem" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: "0.8rem",
+                justifyContent: "flex-end",
+                marginTop: "1.5rem",
+              }}
+            >
               <button
                 onClick={() => setEditSegmentState(null)}
                 disabled={isSavingSegment}
                 style={{
-                  padding: "0.55rem 1.3rem", borderRadius: 8, border: "1px solid #d1d5db",
-                  background: "#f9fafb", fontWeight: 600, fontSize: "0.9rem",
-                  cursor: isSavingSegment ? "not-allowed" : "pointer", color: "#374151",
+                  padding: "0.55rem 1.3rem",
+                  borderRadius: 8,
+                  border: "1px solid #d1d5db",
+                  background: "#f9fafb",
+                  fontWeight: 600,
+                  fontSize: "0.9rem",
+                  cursor: isSavingSegment ? "not-allowed" : "pointer",
+                  color: "#374151",
                 }}
               >
                 Cancel
@@ -1219,9 +1401,15 @@ export default function DTRPage() {
                 onClick={handleSaveEditSegment}
                 disabled={isSavingSegment}
                 style={{
-                  padding: "0.55rem 1.4rem", borderRadius: 8, border: "none",
-                  background: isSavingSegment ? "#94a3b8" : "linear-gradient(120deg,#4c5fb8 0%,#2f87d4 100%)",
-                  color: "#fff", fontWeight: 700, fontSize: "0.9rem",
+                  padding: "0.55rem 1.4rem",
+                  borderRadius: 8,
+                  border: "none",
+                  background: isSavingSegment
+                    ? "#94a3b8"
+                    : "linear-gradient(120deg,#4c5fb8 0%,#2f87d4 100%)",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: "0.9rem",
                   cursor: isSavingSegment ? "not-allowed" : "pointer",
                 }}
               >
