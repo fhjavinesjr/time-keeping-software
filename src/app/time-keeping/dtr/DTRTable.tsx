@@ -80,11 +80,11 @@ const getStatusClass = (status: string) => {
   const normalized = status.toLowerCase();
 
   if (normalized.includes("holiday")) return styles.statusHoliday;
+  if (normalized.includes("pass slip")) return styles.statusPassSlip;
   if (normalized.includes("present")) return styles.statusPresent;
   if (normalized.includes("late")) return styles.statusLate;
   if (normalized.includes("rest")) return styles.statusRestDay;
   if (normalized === "cto") return styles.statusCto;
-  if (normalized.includes("pass slip")) return styles.statusPassSlip;
   if (normalized.includes("official business") || normalized.includes("official time")) return styles.statusOfficialEngagement;
   if (normalized.includes("time corrected")) return styles.statusTimeCorrection;
   if (normalized.includes("leave")) return styles.statusLeave;

@@ -104,6 +104,11 @@
       cursor: pointer;
     }
 
+    :global(.fc-daygrid-day).selectedDate {
+      background-color: #dbeafe;
+      box-shadow: inset 0 0 0 3px #2563eb;
+    }
+
     :global(.fc-daygrid-day-number) {
       font-weight: bold;
       font-size: 0.9rem;
@@ -190,10 +195,52 @@
 
   }
 
-  .autoFillContainer {
+  .scheduleActions {
     display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
     justify-content: flex-end;
     margin-bottom: 0.75rem;
+  }
+
+  .selectionHint {
+    margin-right: auto;
+    color: #1e3a8a;
+    font-size: 0.88rem;
+    font-weight: 600;
+  }
+
+  .bulkAssignButton,
+  .cancelSelectionButton {
+    padding: 0.45rem 1.1rem;
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+  }
+
+  .bulkAssignButton {
+    background-color: #2563eb;
+
+    &:hover:not(:disabled) {
+      background-color: #1d4ed8;
+    }
+  }
+
+  .cancelSelectionButton {
+    background-color: #64748b;
+
+    &:hover:not(:disabled) {
+      background-color: #475569;
+    }
   }
 
   .autoFillButton {
@@ -209,6 +256,11 @@
 
     &:hover {
       background-color: #334155;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
     }
   }
 

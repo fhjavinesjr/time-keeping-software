@@ -12,20 +12,20 @@ import { runtimeConfig } from "@/lib/utils/runtimeConfig";
 const menuItems = [
   {
     id: 1,
-    icon: "/time_keeping.png",
-    label: "Daily Time Record",
-    goto: "/time-keeping/dtr",
-    isActive: false,
-    permKey: "tk.dtr",
-  },
-  {
-    id: 2,
     icon: "/time_shift.png",
     label: "Work Schedule",
     goto: "/time-keeping/workschedule",
     isActive: false,
     permKey: "tk.workSchedule",
   },
+  {
+    id: 2,
+    icon: "/time_keeping.png",
+    label: "Daily Time Record",
+    goto: "/time-keeping/dtr",
+    isActive: false,
+    permKey: "tk.dtr",
+  }
 ];
 
 const otherItems = [

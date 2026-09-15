@@ -113,12 +113,16 @@ export default function WorkSchedule() {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
     null,
   );
-  const [userRole, setUserRole] = useState<string | null>(null);
   const [employeeInputValue, setEmployeeInputValue] = useState<string>("");
   const [timeShift, setTimeShift] = useState<TimeShift[]>([]);
   const [currentCalendarDate, setCurrentCalendarDate] = useState<Date>(
     new Date(),
   );
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [selectedWorkDates, setSelectedWorkDates] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
   const canAdd = localStorageUtil.canAdd("tk.workSchedule");
   const canEdit = localStorageUtil.canEdit("tk.workSchedule");
   const canDelete = localStorageUtil.canDelete("tk.workSchedule");
@@ -344,8 +348,6 @@ export default function WorkSchedule() {
     const employeeId = localStorageUtil.getEmployeeId();
     const fullname = localStorageUtil.getEmployeeFullname();
 
-    setUserRole(role);
-
     const storedEmployees = localStorageUtil.getEmployees();
     setEmployees(storedEmployees);
 
@@ -379,7 +381,7 @@ export default function WorkSchedule() {
 
     const today = new Date();
     fetchAllWorkSchedule(employeeId, today.getFullYear(), today.getMonth() + 1);
-  }, [fetchAllWorkSchedule, fetchHolidays, fetchTimeShifts]);
+  }, [canAdd, canEdit, fetchAllWorkSchedule, fetchHolidays, fetchTimeShifts]);
 
   useEffect(() => {
     if (selectedEmployee) {
@@ -393,6 +395,11 @@ export default function WorkSchedule() {
       setWorkScheduleEvents([]); // clear schedule-only events if no employee
     }
   }, [fetchAllWorkSchedule, selectedEmployee]);
+
+  useEffect(() => {
+    setSelectedWorkDates(new Set());
+    setIsMultiSelectMode(false);
+  }, [selectedEmployee]);
 
   const saveOrUpdateWorkSchedule = async (
     employeeId: string,
@@ -561,6 +568,149 @@ export default function WorkSchedule() {
       return sum + (end - start);
     }, 0);
 
+  const toggleWorkDateSelection = (date: string) => {
+    const normalizedDate = normalizeWorkDate(date);
+    setSelectedWorkDates((currentDates) => {
+      const nextDates = new Set(currentDates);
+      if (nextDates.has(normalizedDate)) {
+        nextDates.delete(normalizedDate);
+      } else {
+        nextDates.add(normalizedDate);
+      }
+      return nextDates;
+    });
+  };
+
+  const cancelMultiSelect = () => {
+    setSelectedWorkDates(new Set());
+    setIsMultiSelectMode(false);
+  };
+
+  const getShiftConflict = (date: string, shift: TimeShift) => {
+    const dayEvents = getEventsForDate(date);
+    if (
+      dayEvents.some((event) => event.extendedProps?.eventType === "dayOff")
+    ) {
+      return "is marked as a Rest Day";
+    }
+    if (hasDuplicateShiftCode(date, shift.tsCode)) {
+      return `already has shift ${shift.tsCode}`;
+    }
+
+    const dayShifts = dayEvents
+      .map((event) => getShiftByCode(event.title))
+      .filter((existingShift): existingShift is TimeShift => !!existingShift);
+    if (isOverlapping(shift, dayShifts)) {
+      return "has an overlapping shift";
+    }
+    if (getTotalMinutes([...dayShifts, shift]) > 24 * 60) {
+      return "would exceed 24 total shift hours";
+    }
+    return null;
+  };
+
+  const handleBulkAssignShift = async () => {
+    if (!selectedEmployee || selectedWorkDates.size === 0 || isBulkSaving) {
+      return;
+    }
+
+    const selectedDates = Array.from(selectedWorkDates).sort();
+    const shiftOptions = Object.fromEntries(
+      timeShift.map((shift) => [
+        shift.tsCode,
+        `${shift.tsCode} (${to12HourFormat(shift.timeIn)} - ${to12HourFormat(shift.timeOut)})`,
+      ]),
+    );
+    const { value: selectedShiftCode, isConfirmed } = await Swal.fire({
+      title: `Assign one shift to ${selectedDates.length} date(s)`,
+      input: "select",
+      inputOptions: shiftOptions,
+      inputPlaceholder: "Select a time shift",
+      showCancelButton: true,
+      confirmButtonText: "Assign Shift",
+      inputValidator: (value) => {
+        if (!value) return "Please select a time shift.";
+        const shift = getShiftByCode(value);
+        if (!shift) return "The selected time shift is invalid.";
+
+        const conflicts = selectedDates
+          .map((date) => {
+            const reason = getShiftConflict(date, shift);
+            return reason ? `${date} ${reason}` : null;
+          })
+          .filter((conflict): conflict is string => !!conflict);
+        if (conflicts.length > 0) {
+          const preview = conflicts.slice(0, 3).join("; ");
+          const remaining = conflicts.length - 3;
+          return `${preview}${remaining > 0 ? `; and ${remaining} more` : ""}. Deselect conflicting dates first.`;
+        }
+        return null;
+      },
+      allowOutsideClick: false,
+      returnFocus: false,
+    });
+
+    if (!isConfirmed || !selectedShiftCode) return;
+
+    const shift = getShiftByCode(selectedShiftCode);
+    if (!shift) return;
+
+    setIsBulkSaving(true);
+    try {
+      const results = await Promise.allSettled(
+        selectedDates.map(async (workDate) => {
+          const res = await fetchWithAuth(
+            `${API_BASE_URL_TIMEKEEPING}/api/create/work-schedule`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                employeeId: selectedEmployee.employeeId,
+                tsCode: shift.tsCode,
+                wsDateTime: buildWsDateTime(workDate, shift.tsCode),
+              }),
+            },
+          );
+          if (!res.ok) {
+            throw new Error(`Failed to save ${workDate}: ${res.status}`);
+          }
+          return workDate;
+        }),
+      );
+
+      const failedDates = results.flatMap((result, index) =>
+        result.status === "rejected" ? [selectedDates[index]] : [],
+      );
+      const savedCount = selectedDates.length - failedDates.length;
+
+      await fetchAllWorkSchedule(
+        selectedEmployee.employeeId,
+        currentCalendarDate.getFullYear(),
+        currentCalendarDate.getMonth() + 1,
+      );
+
+      if (failedDates.length === 0) {
+        cancelMultiSelect();
+        await Swal.fire({
+          title: "Done!",
+          text: `${shift.tsCode} was assigned to ${savedCount} date(s).`,
+          icon: "success",
+          returnFocus: false,
+        });
+      } else {
+        setSelectedWorkDates(new Set(failedDates));
+        await Swal.fire({
+          title: "Partially saved",
+          text: `${savedCount} date(s) were saved, but ${failedDates.length} failed. The failed dates remain selected so you can retry.`,
+          icon: "warning",
+          returnFocus: false,
+        });
+      }
+    } finally {
+      setIsBulkSaving(false);
+    }
+  };
+
   // Assign/Create Work Schedule (multiple shifts per day, no overlap, max 24h)
   const handleDateClick = async (arg: DateClickArg) => {
     if (!selectedEmployee) {
@@ -570,6 +720,11 @@ export default function WorkSchedule() {
         icon: "warning",
         returnFocus: false,
       });
+      return;
+    }
+
+    if (isMultiSelectMode) {
+      toggleWorkDateSelection(arg.dateStr);
       return;
     }
 
@@ -723,6 +878,13 @@ export default function WorkSchedule() {
 
   //Update/Delete Work Schedule
   const handleEventClick = async (clickInfo: EventClickArg) => {
+    if (isMultiSelectMode) {
+      if (clickInfo.event.startStr) {
+        toggleWorkDateSelection(clickInfo.event.startStr);
+      }
+      return;
+    }
+
     const eventType = (clickInfo.event.extendedProps?.eventType || "") as
       | "holiday"
       | "workSchedule"
@@ -895,7 +1057,7 @@ export default function WorkSchedule() {
         <p style="margin-bottom:0.75rem">Employee: <strong>${selectedEmployee.fullName}</strong></p>
         <p style="font-size:0.88rem;color:#555;margin-bottom:0.5rem">Select which weekdays are rest days:</p>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.4rem 1rem;margin:0.5rem 0 1rem;text-align:left">
-          <label><input type="checkbox" id="af-sun" /> Sun</label>
+          <label><input type="checkbox" id="af-sun" checked /> Sun</label>
           <label><input type="checkbox" id="af-mon" /> Mon</label>
           <label><input type="checkbox" id="af-tue" /> Tue</label>
           <label><input type="checkbox" id="af-wed" /> Wed</label>
@@ -1276,11 +1438,53 @@ export default function WorkSchedule() {
                 </div>
               </div>
               {canAdd && (
-                <div className={styles.autoFillContainer}>
+                <div className={styles.scheduleActions}>
+                  {canEdit && !isMultiSelectMode ? (
+                    <button
+                      type="button"
+                      className={styles.bulkAssignButton}
+                      onClick={() => setIsMultiSelectMode(true)}
+                      disabled={!selectedEmployee}
+                      title={
+                        selectedEmployee
+                          ? "Select several calendar dates and assign one shift"
+                          : "Select an employee first"
+                      }
+                    >
+                      Select Multiple Dates
+                    </button>
+                  ) : canEdit ? (
+                    <>
+                      <span className={styles.selectionHint}>
+                        Click date boxes to select them ({selectedWorkDates.size}{" "}
+                        selected)
+                      </span>
+                      <button
+                        type="button"
+                        className={styles.bulkAssignButton}
+                        onClick={() => void handleBulkAssignShift()}
+                        disabled={selectedWorkDates.size === 0 || isBulkSaving}
+                      >
+                        {isBulkSaving
+                          ? "Saving..."
+                          : `Assign Shift (${selectedWorkDates.size})`}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.cancelSelectionButton}
+                        onClick={cancelMultiSelect}
+                        disabled={isBulkSaving}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : null}
                   <button
+                    type="button"
                     className={styles.autoFillButton}
                     onClick={handleAutoFillDayOff}
                     title="Bulk-add rest days for a selected month"
+                    disabled={isMultiSelectMode || isBulkSaving}
                   >
                     Auto-fill Rest Days
                   </button>
@@ -1300,6 +1504,11 @@ export default function WorkSchedule() {
                 editable={false}
                 selectable={true}
                 height="auto"
+                dayCellClassNames={(arg) =>
+                  selectedWorkDates.has(format(arg.date, "yyyy-MM-dd"))
+                    ? [styles.selectedDate]
+                    : []
+                }
                 eventContent={(arg) => {
                   const eventType = arg.event.extendedProps?.eventType as
                     | "holiday"
@@ -1363,6 +1572,7 @@ export default function WorkSchedule() {
                     );
                     const year = midDate.getFullYear();
                     const month = midDate.getMonth() + 1;
+                    setSelectedWorkDates(new Set());
                     setCurrentCalendarDate(new Date(year, month - 1, 1));
                     fetchAllWorkSchedule(
                       selectedEmployee.employeeId,

@@ -81,6 +81,12 @@ type LeaveApplicationDTO = {
   startDate: string | null; // yyyy-MM-dd
   endDate: string | null; // yyyy-MM-dd
   approvedStatus: string;
+  withPay?: boolean | null;
+};
+
+type LeaveDisplay = {
+  leaveType: string;
+  withPay: boolean;
 };
 
 // Compensatory Time Off — only fields needed for DTR overlay.
@@ -382,7 +388,7 @@ export default function DTRPage() {
   // date → leaveType map.  Leave Monetization is excluded (no date range).
   const fetchLeaveMap = async (
     employeeId: string,
-  ): Promise<Map<string, string>> => {
+  ): Promise<Map<string, LeaveDisplay>> => {
     try {
       const res = await fetchWithAuth(
         `${API_BASE_URL_HRM}/api/leave-application/get-all/${employeeId}`,
@@ -390,7 +396,7 @@ export default function DTRPage() {
       if (!res.ok || res.status === 204) return new Map();
 
       const data: LeaveApplicationDTO[] = await res.json();
-      const map = new Map<string, string>();
+      const map = new Map<string, LeaveDisplay>();
 
       data.forEach((leave) => {
         if (
@@ -406,7 +412,10 @@ export default function DTRPage() {
         const end = new Date(leave.endDate);
         while (cursor <= end) {
           const key = cursor.toISOString().split("T")[0]; // yyyy-MM-dd
-          map.set(key, leave.leaveType);
+          map.set(key, {
+            leaveType: leave.leaveType,
+            withPay: leave.withPay !== false,
+          });
           cursor.setDate(cursor.getDate() + 1);
         }
       });
@@ -423,13 +432,18 @@ export default function DTRPage() {
   // attendance event with an inclusive work-date range.
   const overlayLeaves = (
     rows: DTRDailyDTO[],
-    leaveDateMap: Map<string, string>,
+    leaveDateMap: Map<string, LeaveDisplay>,
   ): DTRDailyDTO[] => {
     if (leaveDateMap.size === 0) return rows;
     return rows.map((rec) => {
       const dateKey = toIsoDateKey(rec.workDate);
-      const leaveType = leaveDateMap.get(dateKey);
-      return leaveType ? { ...rec, attendanceStatus: leaveType } : rec;
+      const leave = leaveDateMap.get(dateKey);
+      return leave
+        ? {
+            ...rec,
+            attendanceStatus: `${leave.leaveType} (${leave.withPay ? "With Pay" : "Without Pay"})`,
+          }
+        : rec;
     });
   };
 
@@ -494,19 +508,64 @@ export default function DTRPage() {
     }
   };
 
-  // Pass Slip may coexist with biometric segments. It does not override CTO,
-  // but it is not hidden merely because Search created a Present transaction.
+  // Keep the biometric/absence status visible and append the pass-slip purpose.
+  // A partial Personal pass slip must never make an absent day look fully excused.
   const overlayPassSlips = (
     rows: DTRDailyDTO[],
     passSlipDetailMap: Map<string, OverlayDetail>,
+    scheduledTimesMap: Map<string, ScheduledTimes[]>,
   ): DTRDailyDTO[] => {
     if (passSlipDetailMap.size === 0) return rows;
     return rows.map((rec) => {
       if (rec.attendanceStatus.toLowerCase() === "cto") return rec;
       const dateKey = toIsoDateKey(rec.workDate);
-      return passSlipDetailMap.has(dateKey)
-        ? { ...rec, attendanceStatus: "Pass Slip" }
-        : rec;
+      const detail = passSlipDetailMap.get(dateKey);
+      if (!detail || detail.kind !== "PASS_SLIP") return rec;
+      const purpose = detail.purpose?.toLowerCase().startsWith("official") ? "Official" : "Personal";
+      const scheduled = scheduledTimesMap.get(dateKey)?.[0];
+      const workStart = timeToMinutes(scheduled?.timeIn ?? "08:00:00");
+      const workEnd = timeToMinutes(scheduled?.timeOut ?? "17:00:00");
+      const departure = timeToMinutes(detail.departureTime);
+      const arrival = timeToMinutes(detail.arrivalTime);
+      const breakStart = timeToMinutes(scheduled?.breakOut ?? "12:00:00");
+      const breakEnd = timeToMinutes(scheduled?.breakIn ?? "13:00:00");
+      const overlap = (startA: number, endA: number, startB: number, endB: number) =>
+        Math.max(0, Math.min(endA, endB) - Math.max(startA, startB));
+      const hasConfiguredBreak = scheduled
+        ? Boolean(scheduled.breakOut && scheduled.breakIn)
+        : true;
+      const coveredMinutes = Math.max(
+        0,
+        overlap(departure, arrival, workStart, workEnd) -
+          (hasConfiguredBreak ? overlap(departure, arrival, breakStart, breakEnd) : 0),
+      );
+      const scheduledMinutes = Math.max(
+        1,
+        workEnd - workStart -
+          (hasConfiguredBreak ? overlap(workStart, workEnd, breakStart, breakEnd) : 0),
+      );
+      const touchesStart = departure <= workStart;
+      const touchesEnd = arrival >= workEnd;
+      const fullDayOfficial = purpose === "Official" && coveredMinutes >= scheduledMinutes;
+      const personalMidShiftMinutes =
+        purpose === "Personal" && !touchesStart && !touchesEnd &&
+        !rec.attendanceStatus.toLowerCase().includes("absent")
+          ? coveredMinutes
+          : 0;
+      return {
+        ...rec,
+        attendanceStatus: fullDayOfficial
+          ? "Pass Slip (Official - Full Shift)"
+          : `${rec.attendanceStatus} / Pass Slip (${purpose})`,
+        totalLateMinutes:
+          purpose === "Official" && touchesStart
+            ? Math.max(0, rec.totalLateMinutes - coveredMinutes)
+            : rec.totalLateMinutes,
+        totalUndertimeMinutes:
+          purpose === "Official" && touchesEnd
+            ? Math.max(0, rec.totalUndertimeMinutes - coveredMinutes)
+            : rec.totalUndertimeMinutes + personalMidShiftMinutes,
+      };
     });
   };
 
@@ -786,6 +845,7 @@ export default function DTRPage() {
                     ctoSet204,
                   ),
                   passSlipDetailMap204,
+                  scheduledTimesMap204,
                 ),
                 oeDetailMap204,
               ),
@@ -877,8 +937,9 @@ export default function DTRPage() {
                   leaveMap,
                 ),
                 ctoSet,
-              ),
-              passSlipDetailMap,
+            ),
+            passSlipDetailMap,
+            scheduledTimesMap,
             ),
             oeDetailMap,
           ),
