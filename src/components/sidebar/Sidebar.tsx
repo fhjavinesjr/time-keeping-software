@@ -28,6 +28,18 @@ const menuItems = [
   }
 ];
 
+const reportItems = [
+  {
+    icon: "/time_keeping.png",
+    label: "Timekeeping Reports",
+    goto: "/time-keeping/reports",
+  },
+];
+
+const reportPermissions = ["tk.reports.mra", "tk.reports.tardiness", "tk.reports.undertime",
+  "tk.reports.overtime", "tk.reports.nightDifferential", "tk.reports.incompleteDtr"];
+const canViewReports = () => reportPermissions.some((key) => localStorageUtil.canAccess(key));
+
 const otherItems = [
   {
     id: 1,
@@ -82,6 +94,24 @@ export default function Sidebar() {
           ))}
         </div>
       </div>
+
+      {canViewReports() && (
+        <div className={styles.menuSection}>
+          <h2 className={styles.menuHeader}>REPORTS</h2>
+          <div role="menu">
+            {reportItems.map((item) => (
+              <MenuItem
+                key={item.goto}
+                icon={item.icon}
+                label={item.label}
+                goto={item.goto}
+                isActive={pathname === item.goto}
+                onClick={() => {}}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className={styles.menuSection}>
         <h2 className={styles.menuHeader}>UTILITIES</h2>
