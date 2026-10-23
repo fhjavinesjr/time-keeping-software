@@ -86,7 +86,7 @@ export async function bootstrapSso(code: string, target: SsoTarget): Promise<voi
   }
   localStorage.setItem(
     "isAdministrator",
-    isInstallAdmin || exchange.permission?.isAdministrator ? "true" : "false"
+    isInstallAdmin ? "true" : "false"
   );
   localStorage.setItem("permissionName", exchange.permission?.permissionName ?? "");
   if (isInstallAdmin) {

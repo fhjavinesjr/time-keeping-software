@@ -1,0 +1,20 @@
+.layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); width: 100%; min-height: calc(100vh - 60px); gap: 22px; padding: 24px; background: #f3f5f9; color: #24344d; }
+.reportList, .reportPanel { background: #fff; border: 1px solid #dce4f0; border-radius: 10px; padding: 24px; }
+.reportList h2 { margin: 0 0 18px; font-size: 15px; }
+.selectedReport, .reportChoice { display: block; width: 100%; text-align: left; border: 0; border-radius: 6px; padding: 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.selectedReport { background: #e8ecff; color: #4355c7; font-weight: 600; }
+.reportChoice { background: transparent; color: #24344d; }
+.reportChoice:hover, .reportChoice:focus-visible { background: #f2f5fc; }
+.reportPanel h1 { margin: 0 0 8px; color: #394fb6; font-size: 23px; }
+.reportPanel h2 { margin: 26px 0 8px; font-size: 16px; }
+.reportPanel p { line-height: 1.5; }
+.fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 20px; }
+.fields label { display: flex; flex-direction: column; gap: 7px; font-size: 13px; font-weight: 600; }
+.fields input, .fields select { border: 1px solid #bac8dd; border-radius: 6px; background: #fff; padding: 10px; min-height: 42px; color: #24344d; font: inherit; }
+.fields input:focus, .fields select:focus { outline: 2px solid #6574dd; outline-offset: 1px; }
+.fields small { color: #66748b; font-weight: 400; }
+.printButton { margin-top: 28px; padding: 11px 20px; border: 0; border-radius: 6px; background: #5965d8; color: white; cursor: pointer; font-weight: 600; }
+.printButton:disabled { opacity: .55; cursor: not-allowed; }
+.error { background: #fff0f0; color: #a42828; border: 1px solid #f0b7b7; padding: 10px; border-radius: 6px; }
+.note { margin-top: 25px; font-size: 12px; color: #66748b; }
+@media (max-width: 850px) { .layout { grid-template-columns: 1fr; padding: 12px; } .fields { grid-template-columns: 1fr; } }
